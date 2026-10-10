@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UrbanSync — Geospatial Municipal Incident Management</title>
+    <meta name="description" content="UrbanSync: Geospatial Municipal Incident Management with Fraud-Resistant Credit Allocation. Operating in Bokaro Steel City, Jharkhand, India.">
+    <meta name="keywords" content="UrbanSync, Municipal Incident Management, Bokaro Steel City, Geospatial Waste Management, Swachh Bharat, Smart City, Green Credits">
+    <meta name="author" content="Aditya Raj">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="UrbanSync — Geospatial Municipal Incident Management">
+    <meta property="og:description" content="Geospatial Municipal Incident Management with Fraud-Resistant Credit Allocation in Bokaro Steel City.">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="UrbanSync — Geospatial Municipal Incident Management">
+    <meta property="twitter:description" content="Geospatial Municipal Incident Management with Fraud-Resistant Credit Allocation in Bokaro Steel City.">
+    
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "UrbanSync",
+      "description": "Geospatial Municipal Incident Management with Fraud-Resistant Credit Allocation.",
+      "applicationCategory": "GovernmentApplication",
+      "operatingSystem": "Any",
+      "author": {
+        "@type": "Person",
+        "name": "Aditya Raj",
+        "url": "https://www.linkedin.com/in/aditya-raj-022889366"
+      }
+    }
+    </script>
+    
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=2.0">
+    <style>
+        /* 🗺️ CUSTOM MAP LEGEND */
+        .info.legend {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .info.legend i {
+            width: 12px;
+            height: 12px;
+            float: left;
+            margin-right: 8px;
+            margin-top: 4px;
+            opacity: 0.9;
+            border-radius: 50%;
+        }
+
+        /* 🟢 CUSTOM CLUSTER ICONS */
+        .custom-cluster {
+            background-color: rgba(34, 197, 94, 0.9);
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', sans-serif;
+            border: 3px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .custom-cluster-medium {
+            background-color: rgba(249, 115, 22, 0.9);
+        }
+
+        .custom-cluster-large {
+            background-color: rgba(239, 68, 68, 0.9);
+        }
+    </style>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+</head>
+
+<body>
+
+    <!-- ⚡ BACKEND WAKE-UP BANNER -->
+    <div id="wakeUpBanner" style="
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0;
+        z-index: 99999;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: white;
+        padding: 14px 20px;
+        text-align: center;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.9rem;
+        box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+        animation: slideDown 0.4s ease-out;
+    ">
+        <style>
+            @keyframes slideDown { from { transform: translateY(-100%); opacity:0; } to { transform: translateY(0); opacity:1; } }
+            @keyframes slideUp   { from { transform: translateY(0); opacity:1; } to { transform: translateY(-100%); opacity:0; } }
+            @keyframes spin { to { transform: rotate(360deg); } }
+            #wakeUpSpinner {
+                display: inline-block;
+                width: 14px; height: 14px;
+                border: 2px solid rgba(255,255,255,0.3);
+                border-top-color: #10b981;
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+                margin-right: 8px;
+                vertical-align: middle;
+            }
+        </style>
+        <span id="wakeUpSpinner"></span>
+        <span id="wakeUpText">🏙️ Connecting to UrbanSync Municipal Gateway&hellip;</span>
+    </div>
+
+    <!-- STICKY HEADER -->
+    <header class="site-header" id="siteHeader">
+        <div class="container">
+            <div class="header-inner">
+                <div class="logo">
+                    <span class="logo-icon">🏙️</span>
+                    <span class="logo-text">UrbanSync</span>
+                </div>
+
+                <nav class="main-nav">
+                    <a href="#features" class="nav-link">Features</a>
+                    <a href="#journey" class="nav-link">How It Works</a>
+                    <a href="#impact" class="nav-link">Bokaro Map</a>
+                    <a href="#leaderboard" class="nav-link">Leaderboard</a>
+                </nav>
+
+                <div class="header-actions">
+                    <!-- Before Login -->
+                    <div id="authButtons" class="auth-buttons">
+                        <button id="loginBtn" class="btn-outline">Login</button>
+                        <button id="signupBtn" class="btn-primary">Sign Up</button>
+                    </div>
+
+                    <!-- After Login -->
+                    <div id="userWelcome" class="user-welcome hidden"></div>
+                </div>
+
+                <!-- Mobile Menu Toggle -->
+                <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="hero-section">
+        <div class="container">
+            <div class="hero-content">
+                <div style="display: inline-block; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10b981; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px;">
+                    📍 Municipal Service Area: Bokaro Steel City, Jharkhand
+                </div>
+                <h1 class="hero-title">UrbanSync: Geospatial Municipal Incident Management</h1>
+                <p class="hero-subtitle">Empowering citizens, ward officers, and sanitation workers to report, triage, and resolve municipal incidents with fraud-resistant credit allocation.</p>
+                <div class="hero-buttons">
+                    <button onclick="document.getElementById('signupBtn').click()" class="btn-primary btn-large">Get Started</button>
+                    <button onclick="scrollToSection('journey')" class="btn-outline btn-large">Learn More</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hero Background Animation -->
+        <div class="hero-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+        </div>
+    </section>
+
+    <!-- KEY HIGHLIGHTS -->
+    <section class="highlights-section" id="features">
+        <div class="container">
+            <h2 class="section-title">Why UrbanSync?</h2>
+            <p class="section-subtitle">A closed-loop civic action ecosystem engineered for modern Indian municipal corporations</p>
+
+            <div class="highlights-grid">
+                <div class="highlight-card">
+                    <div class="highlight-icon">📍</div>
+                    <h3>Geospatial Triage</h3>
+                    <p>Automated 5-zone incident dispatch across Bokaro Steel City using live GPS coordinates and bounding polygon validation.</p>
+                </div>
+
+                <div class="highlight-card">
+                    <div class="highlight-icon">🛡️</div>
+                    <h3>Fraud-Resistant Credits</h3>
+                    <p>Cryptographic MD5 image deduplication prevents duplicate submissions while rewarding genuine civic contributions.</p>
+                </div>
+
+                <div class="highlight-card">
+                    <div class="highlight-icon">⚡</div>
+                    <h3>Real-Time Dispatch</h3>
+                    <p>Live WebSocket telemetry immediately alerts zone officers and frontline sanitation workers to pending tasks.</p>
+                </div>
+
+                <div class="highlight-card">
+                    <div class="highlight-icon">🎁</div>
+                    <h3>Civic Rewards</h3>
+                    <p>Redeem verified credits for UPI cashbacks, mobile recharge vouchers, and municipal utility bill discounts.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- YOUR JOURNEY -->
+    <section class="journey-section" id="journey">
+        <div class="container">
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-subtitle">Three streamlined steps from civic reporting to verified cleanup</p>
+
+            <div class="journey-steps">
+                <div class="journey-step">
+                    <div class="step-number">1</div>
+                    <div class="step-icon">📸</div>
+                    <h3>Report & Geotag</h3>
+                    <p>Capture incident photo with GPS location; AI classifies waste and checks for duplicate submissions.</p>
+                </div>
+
+                <div class="journey-connector">→</div>
+
+                <div class="journey-step">
+                    <div class="step-number">2</div>
+                    <div class="step-icon">👷</div>
+                    <h3>Worker Dispatch</h3>
+                    <p>Zone municipal officers allocate tickets to active Safai Karmacharis who resolve and upload after-photos.</p>
+                </div>
+
+                <div class="journey-connector">→</div>
+
+                <div class="journey-step">
+                    <div class="step-number">3</div>
+                    <div class="step-icon">🏆</div>
+                    <h3>Verification & Credits</h3>
+                    <p>Supervisors approve verified cleanups, releasing Green Credits and updating the live city heatmap.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- IMPACT HEATMAP SECTION -->
+    <section class="impact-section" id="impact" style="padding: 60px 0; background: #f8fafc;">
+        <div class="container">
+            <h2 class="section-title" style="text-align: center; color: var(--gray-900);">Bokaro Steel City Incident Heatmap 🗺️</h2>
+            <p class="section-subtitle" style="text-align: center; margin-bottom: 30px; color: var(--gray-600);">Live geospatial visualization of reported and resolved sanitation incidents across Bokaro's 5 operational zones</p>
+            <div class="map-container" style="border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 20px; border: 4px solid white;">
+                <div id="impactMap" style="height: 500px; width: 100%;"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- LEADERBOARD SECTION -->
+    <section class="leaderboard-section" id="leaderboard">
+        <div class="container">
+            <h2 class="section-title">Civic Leaderboard 🏆</h2>
+            <p class="section-subtitle">Top citizen contributors championing clean neighborhoods in Bokaro Steel City</p>
+
+            <div id="leaderboardContainer" class="leaderboard-container">
+                <div class="loader">Loading leaderboard...</div>
+            </div>
+
+            <div class="leaderboard-info">
+                <h3>How to Earn Credits</h3>
+                <ul class="climb-list">
+                    <li>📸 Submit valid incident reports with photos (+10 credits)</li>
+                    <li>📍 Pinpoint precise GPS coordinates (+5 bonus credits)</li>
+                    <li>🔥 Build daily civic reporting streaks for multiplier badges</li>
+                    <li>🎁 Redeem credits in the Rewards Store for UPI vouchers & rebates</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- MAIN CITIZEN DASHBOARD (LOGGED IN) -->
+    <div id="dashboardSection" class="dashboard-section hidden">
+        <div class="container">
+            <!-- Navigation Tabs -->
+            <div class="dashboard-tabs">
+                <button class="tab-btn active" data-tab="report">Submit Incident</button>
+                <button class="tab-btn" data-tab="myReports">My Reports</button>
+                <button class="tab-btn" data-tab="credits">Credits & Badges</button>
+                <button class="tab-btn" data-tab="rewards">Rewards Store</button>
+            </div>
+
+            <!-- Report Form Tab -->
+            <div id="reportSection" class="tab-content active">
+                <div class="dashboard-card">
+                    <h2>Report Municipal Incident</h2>
+                    <p class="card-subtitle">Upload a photograph and location of waste or civic hazards in Bokaro Steel City.</p>
+
+                    <form id="reportForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="photoInput">Incident Photograph *</label>
+                                <div class="file-dropzone" id="fileDropzone">
+                                    <input type="file" id="photoInput" accept="image/*" required>
+                                    <div class="dropzone-content">
+                                        <span class="dropzone-icon">📷</span>
+                                        <p>Click to upload or drag & drop</p>
+                                        <small>PNG, JPG up to 10MB</small>
+                                    </div>
+                                    <img id="photoPreview" class="photo-preview hidden" alt="Preview">
+                                </div>
+                                <div id="aiStatus" class="ai-status hidden"></div>
+                                <input type="hidden" id="aiTags">
+                                <input type="hidden" id="aiConfidence">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="wasteCategory">Waste / Incident Category</label>
+                                <select id="wasteCategory" class="form-select">
+                                    <option value="plastic">Plastic & Packaging</option>
+                                    <option value="organic">Organic / Food Waste</option>
+                                    <option value="paper">Paper & Cardboard</option>
+                                    <option value="metal">Metal & Scrap</option>
+                                    <option value="glass">Glassware</option>
+                                    <option value="ewaste">E-Waste & Electronics</option>
+                                    <option value="other" selected>General / Mixed Waste</option>
+                                </select>
+
+                                <label for="descriptionInput" style="margin-top: 15px;">Incident Description *</label>
+                                <textarea id="descriptionInput" rows="3" class="form-textarea" placeholder="Describe the waste hotspot or landmark nearby..." required></textarea>
+
+                                <label for="locationInput" style="margin-top: 15px;">Location / Address *</label>
+                                <div class="location-input-group">
+                                    <input type="text" id="locationInput" class="form-input" placeholder="e.g. Sector 4 City Centre, Bokaro" required>
+                                    <button type="button" id="gpsBtn" class="btn-location" onclick="getUserLocation()">📍 Use GPS</button>
+                                </div>
+                                <small>GPS location ensures automated routing to the correct Bokaro zone officer</small>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary btn-large">Submit Report & Earn Credits</button>
+                            <button type="button" onclick="document.getElementById('reportForm').reset()" class="btn-outline">Clear Form</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- My Reports Tab -->
+            <div id="myReportsSection" class="tab-content hidden">
+                <div class="dashboard-card">
+                    <h2>My Incident Reports</h2>
+                    <div id="myReportsContainer">
+                        <div class="loader">Loading your reports...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Credits Tab -->
+            <div id="creditsSection" class="tab-content hidden">
+                <div class="dashboard-card">
+                    <h2>My Credits & Badges</h2>
+                    <div id="creditsLoadingState">
+                        <div class="loader">Loading your civic profile...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rewards Store Tab -->
+            <div id="rewardsSection" class="tab-content hidden">
+                <div class="dashboard-card">
+                    <h2>🎁 UrbanSync Rewards Store</h2>
+                    <p class="card-subtitle">Redeem verified Green Credits for real-world payouts and municipal discounts.</p>
+
+                    <div class="rewards-balance" style="margin-bottom: 30px;">
+                        <div class="balance-card" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 16px; padding: 25px; display: flex; align-items: center; gap: 20px; color: white; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); border: 1px solid rgba(255,255,255,0.1);">
+                            <div class="balance-icon" style="font-size: 3rem; background: rgba(16,185,129,0.2); width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">💰</div>
+                            <div class="balance-info" style="display: flex; flex-direction: column;">
+                                <span class="balance-label" style="font-size: 0.9rem; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Available Credit Balance</span>
+                                <div style="display: flex; align-items: baseline; gap: 8px;">
+                                    <span class="balance-amount" id="rewardsBalance" style="font-size: 2.5rem; font-weight: 800; color: #10b981;">0</span>
+                                    <span style="font-size: 1.2rem; font-weight: 600; opacity: 0.9;">Credits</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rewards-categories">
+                        <button class="category-btn active" data-category="all">All Rewards</button>
+                        <button class="category-btn" data-category="vouchers">🎫 Vouchers</button>
+                        <button class="category-btn" data-category="services">🔧 Municipal Services</button>
+                    </div>
+
+                    <div id="rewardsGrid" class="rewards-grid">
+                        <div class="loader">Loading rewards catalog...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA SECTION -->
+    <section class="cta-section">
+        <div class="container">
+            <h2>Ready to Transform Municipal Cleanliness?</h2>
+            <p>Join citizens and sanitation personnel working together across Bokaro Steel City.</p>
+            <button onclick="document.getElementById('signupBtn').click()" class="btn-primary btn-large">
+                Get Started Today
+            </button>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <div class="footer-logo">
+                        <span class="logo-icon">🏙️</span>
+                        <span class="logo-text">UrbanSync</span>
+                    </div>
+                    <p>Geospatial Municipal Incident Management with Fraud-Resistant Credit Allocation.</p>
+                    <p style="margin-top: 8px; font-size: 0.85rem; color: #94a3b8;">Demonstration Geography: Bokaro Steel City, Jharkhand, India.</p>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Quick Links</h4>
+                    <ul class="footer-links">
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#journey">How It Works</a></li>
+                        <li><a href="#impact">Bokaro Map</a></li>
+                        <li><a href="#leaderboard">Leaderboard</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4>Municipal Portals</h4>
+                    <ul class="footer-links">
+                        <li><a href="/officer-login.html" target="_blank">Zone Officer Portal</a></li>
+                        <li><a href="/worker-login.html" target="_blank">Field Worker Portal</a></li>
+                        <li><a href="/worker-register.html" target="_blank">Worker Registration</a></li>
+                        <li><a href="/super-admin-login.html" target="_blank">Super Admin (CMO)</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col" style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px;">
+                    <h4 style="color: #10b981; margin-bottom: 12px;">Developer</h4>
+                    <p style="color: #9ca3af; font-size: 0.85rem; margin-bottom: 15px; line-height: 1.4;">Architected by Aditya Raj. B.Tech Computer Science &amp; Engineering.</p>
+                    <ul class="footer-links">
+                        <li style="margin-bottom: 8px;"><a href="mailto:adityaraj250806@gmail.com">adityaraj250806@gmail.com</a></li>
+                        <li style="margin-bottom: 8px;"><a href="https://www.linkedin.com/in/aditya-raj-022889366" target="_blank">LinkedIn Profile</a></li>
+                        <li><a href="https://github.com/adityaraj250806-jpg" target="_blank">GitHub Repository</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2026 UrbanSync. Developed by Aditya Raj. Academic &amp; Municipal Innovation.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- LOGIN MODAL -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Citizen Login</h2>
+                <button class="modal-close" onclick="closeModal('loginModal')">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 20px; text-align: left; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px dashed #cbd5e1;">
+                <p style="font-size: 0.85rem; font-weight: bold; color: #4b5563; margin-bottom: 8px;">⚡ Demonstration Account:</p>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" onclick="document.getElementById('loginEmail').value='demo@bokaro.gov.in'; document.getElementById('loginPassword').value='Password@123';" style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; font-weight: bold;">Auto-fill Demo</button>
+                    <small style="color: #64748b;">(Citizen testing)</small>
+                </div>
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" placeholder="citizen@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPassword" placeholder="Enter password" required>
+                        <span class="toggle-password" onclick="togglePasswordVisibility('loginPassword', this)">👁️</span>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary btn-large">Login</button>
+            </form>
+            <p class="modal-footer">
+                Don't have an account?
+                <a href="#" onclick="closeModal('loginModal'); document.getElementById('signupBtn').click()">Sign up</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- SIGNUP MODAL -->
+    <div id="signupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create Citizen Account</h2>
+                <button class="modal-close" onclick="closeModal('signupModal')">&times;</button>
+            </div>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="signupName">Full Name</label>
+                    <input type="text" id="signupName" placeholder="Resident Name" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email</label>
+                    <input type="email" id="signupEmail" placeholder="your@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="signupPassword" placeholder="At least 6 characters" required minlength="6">
+                        <span class="toggle-password" onclick="togglePasswordVisibility('signupPassword', this)">👁️</span>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary btn-large">Sign Up</button>
+            </form>
+            <p class="modal-footer">
+                Already have an account?
+                <a href="#" onclick="closeModal('signupModal'); document.getElementById('loginBtn').click()">Login</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- AI Brain & Leaflet scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <!-- Socket.io client -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Connect socket dynamically to the current host
+        if (typeof io !== 'undefined') {
+            window.socket = io(window.location.origin, {
+                withCredentials: true,
+                transports: ['websocket', 'polling']
+            });
+            window.socket.on('connect', () => console.log('✅ UrbanSync Socket connected:', socket.id));
+            window.socket.on('connect_error', (err) => console.warn('Socket connecting/polling fallback:', err.message));
+        }
+    </script>
+
+    <!-- Main Logic -->
+    <script src="script.js?v=2.5"></script>
+</body>
+
+</html>

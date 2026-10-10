@@ -1,0 +1,42 @@
+[
+  {
+    "id": "ZONE-1",
+    "name": "Zone 1 - North Bokaro",
+    "areas": ["Sector 1", "Sector 2", "Bokaro Mall", "Ram Mandir", "Aerodrome"],
+    "color": "#3b82f6",
+    "population": 45000,
+    "area_km2": 9.5
+  },
+  {
+    "id": "ZONE-2",
+    "name": "Zone 2 - South Bokaro",
+    "areas": ["Sector 11", "Sector 12", "Camp 2", "Balidih Industrial Area", "Railway Station"],
+    "color": "#10b981",
+    "population": 52000,
+    "area_km2": 12.4
+  },
+  {
+    "id": "ZONE-3",
+    "name": "Zone 3 - East Bokaro",
+    "areas": ["Sector 8", "Sector 9", "Harla", "Noori Masjid", "Sector 9 Hospital"],
+    "color": "#f59e0b",
+    "population": 48000,
+    "area_km2": 8.8
+  },
+  {
+    "id": "ZONE-4",
+    "name": "Zone 4 - West Bokaro",
+    "areas": ["Sector 5", "Sector 6", "Steel Plant Township Gates", "Vaishno Devi Temple"],
+    "color": "#ef4444",
+    "population": 41000,
+    "area_km2": 10.1
+  },
+  {
+    "id": "ZONE-5",
+    "name": "Zone 5 - Central Bokaro",
+    "areas": ["City Centre", "Sector 4", "Sector 3", "City Park", "Jagannath Temple", "Nehru Zoological Park"],
+    "color": "#8b5cf6",
+    "population": 65000,
+    "area_km2": 7.5
+  }
+]

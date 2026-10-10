@@ -1,0 +1,13 @@
+# Tell Vercel to ignore all backend/Node.js files
+# Only deploy the static frontend from the public/ folder
+server.js
+models/
+config/
+data/
+db/
+uploads/
+Procfile
+render.yaml
+hash-existing-images.js
+sync-credits.js
+netlify.toml

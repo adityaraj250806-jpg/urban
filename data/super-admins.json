@@ -1,0 +1,10 @@
+[
+  {
+    "id": "SA-001",
+    "name": "Chief Municipal Officer - Bokaro",
+    "email": "cmo@bokaro.gov.in",
+    "password": "SuperAdmin@2026",
+    "role": "super_admin",
+    "createdAt": "2026-01-01T09:00:00.000Z"
+  }
+]

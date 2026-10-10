@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <title>Worker Login — UrbanSync</title>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --dark: #111827;
+            --glass: rgba(255, 255, 255, 0.95);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #a7f3d0 0%, #10b981 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Abstract Background Elements */
+        .bg-shape {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            filter: blur(40px);
+            z-index: 0;
+        }
+
+        .shape-1 { width: 400px; height: 400px; top: -100px; left: -100px; }
+        .shape-2 { width: 500px; height: 500px; bottom: -150px; right: -100px; }
+
+        .login-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 50px 40px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            position: relative;
+            z-index: 1;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: white;
+            margin: 0 auto 20px;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+            transform: rotate(-10deg);
+            transition: transform 0.3s ease;
+        }
+
+        .login-card:hover .logo-icon {
+            transform: rotate(0deg);
+        }
+
+        h1 {
+            color: var(--dark);
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        p.subtitle {
+            color: #6b7280;
+            font-size: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #374151;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            transition: color 0.3s;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 15px 15px 15px 45px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        }
+
+        input:focus + i, select:focus + i {
+            color: var(--primary);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+            margin-top: 10px;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 25px rgba(16, 185, 129, 0.4);
+        }
+
+        .quick-login {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px dashed #d1d5db;
+        }
+
+        .quick-login p {
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        /* Toggle Password */
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #9ca3af;
+            z-index: 10;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+
+    <div class="login-card">
+        <div class="logo">
+            <div class="logo-icon"><i class="fas fa-hard-hat"></i></div>
+            <h1>Worker Portal</h1>
+            <p class="subtitle">UrbanSync Frontline Workforce Portal (Bokaro Steel City)</p>
+        </div>
+
+        <form id="workerLoginForm">
+            <div class="form-group">
+                <label>Mobile Number</label>
+                <div class="input-wrapper">
+                    <input type="tel" id="workerMobile" placeholder="Enter mobile number" required>
+                    <i class="fas fa-phone"></i>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <div class="input-wrapper">
+                    <input type="password" id="workerPassword" placeholder="Enter password" required>
+                    <i class="fas fa-lock" style="z-index: 1;"></i>
+                    <i class="fas fa-eye toggle-password" id="toggleWorkerPassword"></i>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-login" id="loginBtn">
+                Access Dashboard <i class="fas fa-arrow-right"></i>
+            </button>
+        </form>
+
+        <div class="quick-login">
+            <p>Don't want to type? Use Quick Login</p>
+            <div class="input-wrapper">
+                <select id="quickLoginSelect" onchange="fillCredentials()">
+                    <option value="">-- Select Demo Worker --</option>
+                    <option value="9999999991">Worker 1 (North Bokaro)</option>
+                    <option value="9999999992">Worker 2 (South Bokaro)</option>
+                    <option value="9999999993">Worker 3 (East Bokaro)</option>
+                </select>
+                <i class="fas fa-bolt"></i>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Quick Login Logic
+        function fillCredentials() {
+            const mobile = document.getElementById('quickLoginSelect').value;
+            if (mobile) {
+                document.getElementById('workerMobile').value = mobile;
+                document.getElementById('workerPassword').value = 'Worker@123';
+            }
+        }
+
+        // Form Submission
+        document.getElementById('workerLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const mobile = document.getElementById('workerMobile').value.trim();
+            const password = document.getElementById('workerPassword').value;
+            const btn = document.getElementById('loginBtn');
+
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+            btn.style.opacity = '0.8';
+
+            try {
+                const response = await fetch('/api/worker/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mobile, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Welcome Back!',
+                        text: 'Logging you into the portal...',
+                        showConfirmButton: false,
+                        timer: 1500
+                    }).then(() => {
+                        window.location.href = '/worker-dashboard.html';
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Login Failed',
+                        text: data.message || 'Invalid credentials. Please try again.',
+                        confirmButtonColor: '#10b981'
+                    });
+                    btn.innerHTML = 'Access Dashboard <i class="fas fa-arrow-right"></i>';
+                    btn.style.opacity = '1';
+                }
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Connection Error',
+                    text: 'Could not connect to the server. Please check your internet.',
+                    confirmButtonColor: '#10b981'
+                });
+                btn.innerHTML = 'Access Dashboard <i class="fas fa-arrow-right"></i>';
+                btn.style.opacity = '1';
+            }
+        });
+
+        // Password Toggle
+        document.getElementById('toggleWorkerPassword').addEventListener('click', function () {
+            const pwd = document.getElementById('workerPassword');
+            const type = pwd.getAttribute('type') === 'password' ? 'text' : 'password';
+            pwd.setAttribute('type', type);
+            this.classList.toggle('fa-eye');
+            this.classList.toggle('fa-eye-slash');
+        });
+    </script>
+</body>
+
+</html>

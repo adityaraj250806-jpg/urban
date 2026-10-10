@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Socket Test</title>
+</head>
+<body>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const socket = io('https://green-credits-hmj9.onrender.com', {
+            withCredentials: true,
+            transports: ['websocket', 'polling']
+        });
+        
+        socket.on('connect', () => {
+            console.log('TEST_SOCKET_CONNECTED:', socket.id);
+            document.body.innerHTML += '<div>Connected: ' + socket.id + '</div>';
+        });
+        
+        socket.on('connect_error', (err) => {
+            console.error('TEST_SOCKET_ERROR:', err.message);
+            document.body.innerHTML += '<div style="color:red">Error: ' + err.message + '</div>';
+        });
+
+        socket.on('newReport', (data) => {
+            console.log('TEST_NEW_REPORT:', data);
+            document.body.innerHTML += '<div style="color:green">Received newReport</div>';
+        });
+    </script>
+</body>
+</html>

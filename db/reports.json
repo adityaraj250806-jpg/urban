@@ -1,0 +1,24 @@
+[
+  {
+    "id": 2,
+    "userId": 1,
+    "description": "Accumulated packaging waste near City Centre commercial complex",
+    "address": "Sector 4 City Centre, Bokaro Steel City",
+    "lat": 23.6693,
+    "lng": 86.1511,
+    "photoUrl": "",
+    "date": "2026-10-01T08:44:10.206Z",
+    "status": "Resolved"
+  },
+  {
+    "id": 1,
+    "userId": 1,
+    "description": "Overflowing public bin near Sector 2 shopping arcade",
+    "address": "Sector 2 Market, Bokaro Steel City",
+    "lat": 23.6782,
+    "lng": 86.1420,
+    "photoUrl": "",
+    "date": "2026-10-01T08:42:45.578Z",
+    "status": "Resolved"
+  }
+]

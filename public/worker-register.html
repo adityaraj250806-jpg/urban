@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <title>Worker Registration — UrbanSync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.2);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .header-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+        }
+
+        .header-title {
+            color: #111827;
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .header-subtitle {
+            color: #6b7280;
+            font-size: 1rem;
+        }
+
+        .worker-badge {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .form-section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            color: #374151;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #374151;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-btn {
+            display: inline-block;
+            padding: 12px 20px;
+            background: #f3f4f6;
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            width: 100%;
+            transition: all 0.2s;
+        }
+
+        .file-input-btn:hover {
+            background: #e5e7eb;
+            border-color: #10b981;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-preview {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0fdf4;
+            border: 1px solid #10b981;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #059669;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+        }
+
+        .info-box {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 25px;
+        }
+
+        .info-box p {
+            color: #1e40af;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon">👷</div>
+            <h1 class="header-title">Worker Registration</h1>
+            <p class="header-subtitle">Join the GreenCredits Team</p>
+            <div class="worker-badge">🔐 Field Worker Application</div>
+        </div>
+
+        <div class="info-box">
+            <p>📝 <strong>Note:</strong> Your application will be reviewed by officers. You will receive login
+                credentials via SMS once approved.</p>
+        </div>
+
+        <form id="workerRegisterForm">
+            <!-- Personal Details -->
+            <div class="form-section">
+                <h3 class="section-title">👤 Personal Details</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Full Name *</label>
+                    <input type="text" class="form-input" id="workerName" placeholder="Ram Kumar" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Mobile Number *</label>
+                    <input type="tel" class="form-input" id="workerMobile" placeholder="9876543210" maxlength="10"
+                        required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Aadhaar Number (Optional)</label>
+                    <input type="text" class="form-input" id="workerAadhaar" placeholder="XXXX-XXXX-1234"
+                        maxlength="12">
+                </div>
+            </div>
+
+            <!-- Work Details -->
+            <div class="form-section">
+                <h3 class="section-title">🗺️ Work Details</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Preferred Zone *</label>
+                    <select class="form-select" id="workerZone" required>
+                        <option value="">Select Zone</option>
+                        <option value="Zone 1 - North Bokaro">Zone 1 - North Bokaro</option>
+                        <option value="Zone 2 - South Bokaro">Zone 2 - South Bokaro</option>
+                        <option value="Zone 3 - East Bokaro">Zone 3 - East Bokaro</option>
+                        <option value="Zone 4 - West Bokaro">Zone 4 - West Bokaro</option>
+                        <option value="Zone 5 - Central Bokaro">Zone 5 - Central Bokaro</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Full Address *</label>
+                    <textarea class="form-input" id="workerAddress" rows="3"
+                        placeholder="Enter your complete address in Bokaro Steel City" required></textarea>
+                </div>
+            </div>
+
+            <!-- Documents -->
+            <div class="form-section">
+                <h3 class="section-title">📄 Documents</h3>
+
+                <div class="form-group">
+                    <label class="form-label">Upload Photo *</label>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-btn" for="workerPhoto">
+                            📷 Choose Photo (JPG/PNG)
+                        </label>
+                        <input type="file" id="workerPhoto" accept="image/*" required
+                            onchange="showPreview(this, 'photoPreview')">
+                    </div>
+                    <div id="photoPreview" class="file-preview" style="display:none;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Upload ID Proof * (Aadhaar/Voter ID)</label>
+                    <div class="file-input-wrapper">
+                        <label class="file-input-btn" for="workerIdProof">
+                            📄 Choose ID Proof (JPG/PNG/PDF)
+                        </label>
+                        <input type="file" id="workerIdProof" accept="image/*,application/pdf" required
+                            onchange="showPreview(this, 'idProofPreview')">
+                    </div>
+                    <div id="idProofPreview" class="file-preview" style="display:none;"></div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+                📝 Submit Application
+            </button>
+        </form>
+    </div>
+
+    <script src="worker.js"></script>
+</body>
+
+</html>
