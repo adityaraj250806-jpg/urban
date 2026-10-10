@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: greencredits-app
+    name: urbansync-app
     env: node
     plan: free
     buildCommand: npm install
@@ -14,3 +14,5 @@ services:
         generateValue: true
       - key: SESSION_SECRET
         generateValue: true
+      - key: CLOUDINARY_FOLDER
+        value: urbansync_uploads

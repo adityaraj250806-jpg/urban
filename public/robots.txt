@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://green-credits-v2-cj1g.vercel.app/sitemap.xml
+Sitemap: https://urbansync.vercel.app/sitemap.xml

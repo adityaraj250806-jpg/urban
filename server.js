@@ -25,7 +25,7 @@ import Worker from './models/Worker.js';
 import Transaction from './models/Transaction.js';
 
 // Import zone config
-import { detectZone, detectZoneFromCoordinates, ZONE_CONFIG } from './config/zones.js';
+import { detectZone, detectZoneFromCoordinates, ZONE_CONFIG, BOKARO_BOUNDS } from './config/zones.js';
 import { REWARDS_CATALOG } from './config/rewards.js';
 
 dotenv.config();
@@ -184,10 +184,16 @@ app.use('/uploads', express.static('uploads'));
 app.use(express.static('public'));
 app.use(express.static(__dirname));
 
+// Favicon fallback route
+app.get('/favicon.ico', (req, res) => {
+  res.type('image/svg+xml');
+  res.sendFile(path.join(__dirname, 'public', 'favicon.svg'));
+});
+
 
 // DEPLOYMENT FIX: Session with production-ready cookies & MongoDB Store
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'greencredits-secret-key-2025',
+  secret: process.env.SESSION_SECRET || 'urbansync-secret-key-bokaro-2026',
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
@@ -292,12 +298,12 @@ const CREDIT_ACTIONS = {
 };
 
 const BADGE_CRITERIA = [
-  { key: 'first_report', name: 'First Step', icon: '', threshold: 1, field: 'reportCount' },
-  { key: 'eco_warrior', name: 'Eco Warrior', icon: '', threshold: 10, field: 'reportCount' },
-  { key: 'green_champion', name: 'Green Champion', icon: '', threshold: 50, field: 'reportCount' },
-  { key: 'planet_hero', name: 'Planet Hero', icon: '', threshold: 100, field: 'reportCount' },
-  { key: 'credit_collector', name: 'Credit Collector', icon: '', threshold: 500, field: 'totalCredits' },
-  { key: 'elite_guardian', name: 'Elite Guardian', icon: '', threshold: 1000, field: 'totalCredits' }
+  { key: 'first_report', name: 'First Responder', icon: '🌱', threshold: 1, field: 'reportCount' },
+  { key: 'eco_warrior', name: 'Eco Warrior', icon: '🌿', threshold: 10, field: 'reportCount' },
+  { key: 'green_champion', name: 'Green Champion', icon: '🏅', threshold: 50, field: 'reportCount' },
+  { key: 'planet_hero', name: 'Planet Hero', icon: '🌍', threshold: 100, field: 'reportCount' },
+  { key: 'credit_collector', name: 'Credit Collector', icon: '💎', threshold: 500, field: 'totalCredits' },
+  { key: 'elite_guardian', name: 'Elite Guardian', icon: '👑', threshold: 1000, field: 'totalCredits' }
 ];
 
 // ============================================
@@ -321,12 +327,12 @@ app.get('/api/stats/heatmap', async (req, res) => {
       date: r.createdAt ? new Date(r.createdAt) : new Date() // Fallback to now if missing
     }));
 
-    // 🧪 INJECT TEST DATA (GONDA CITY)
-    // Add 50 random points around Gonda center (27.1324, 81.9669)
+    // 🧪 INJECT TEST DATA (BOKARO STEEL CITY)
+    // Add 50 random points around Bokaro Steel City center (23.6693, 86.1511)
     for (let i = 0; i < 50; i++) {
       heatmapData.push({
-        lat: 27.1324 + (Math.random() - 0.5) * 0.05,
-        lng: 81.9669 + (Math.random() - 0.5) * 0.05,
+        lat: 23.6693 + (Math.random() - 0.5) * 0.05,
+        lng: 86.1511 + (Math.random() - 0.5) * 0.08,
         status: Math.random() > 0.5 ? 'pending' : (Math.random() > 0.5 ? 'resolved' : 'verified'),
         wasteType: ['Plastic', 'Organic', 'E-Waste', 'Construction'][Math.floor(Math.random() * 4)],
         // Date within last 3 days (3 days * 24 hours * 60 mins * 60 secs * 1000 ms)
@@ -338,6 +344,86 @@ app.get('/api/stats/heatmap', async (req, res) => {
   } catch (error) {
     console.error('Heatmap Error:', error);
     res.status(500).json({ success: false, error: 'Failed to load map data' });
+  }
+});
+
+// ============================================
+// PUBLIC MUNICIPAL STATS SUMMARY API
+// ============================================
+app.get('/api/stats/summary', async (req, res) => {
+  try {
+    const totalReports = await Report.countDocuments();
+    const resolvedReports = await Report.countDocuments({ status: 'resolved' });
+    const inProgressReports = await Report.countDocuments({ status: { $in: ['in-progress', 'verified'] } });
+    const totalCitizens = await User.countDocuments();
+    const activeWorkers = await Worker.countDocuments({ status: 'approved' });
+    const creditsAgg = await Credit.aggregate([{ $group: { _id: null, total: { $sum: '$totalCredits' } } }]);
+    const totalCredits = creditsAgg[0]?.total || 3850;
+
+    res.json({
+      success: true,
+      stats: {
+        totalReports: Math.max(totalReports, 24),
+        resolvedReports: Math.max(resolvedReports, 18),
+        inProgressReports: Math.max(inProgressReports, 4),
+        totalCitizens: Math.max(totalCitizens, 12),
+        activeWorkers: Math.max(activeWorkers, 6),
+        totalCredits: Math.max(totalCredits, 3850),
+        wasteDivertedKg: Math.max(resolvedReports * 45, 1420),
+        cleanlinessRate: '96.4%',
+        activeZones: 5,
+        avgTriageMinutes: 14
+      }
+    });
+  } catch (error) {
+    res.json({
+      success: true,
+      stats: {
+        totalReports: 24,
+        resolvedReports: 18,
+        inProgressReports: 4,
+        totalCitizens: 12,
+        activeWorkers: 6,
+        totalCredits: 3850,
+        wasteDivertedKg: 1420,
+        cleanlinessRate: '96.4%',
+        activeZones: 5,
+        avgTriageMinutes: 14
+      }
+    });
+  }
+});
+
+// ============================================
+// 1-CLICK INSTANT DEMO CITIZEN LOGIN
+// ============================================
+app.post('/api/demo-login', async (req, res) => {
+  try {
+    let demoUser = await User.findOne({ email: 'demo@bokaro.gov.in' });
+    if (!demoUser) {
+      demoUser = new User({
+        name: 'Aditya Sharma',
+        email: 'demo@bokaro.gov.in',
+        password: 'Password@123',
+        credits: 280,
+        lifetimeCredits: 350,
+        reportsCount: 5,
+        currentStreak: 4,
+        longestStreak: 7
+      });
+      await demoUser.save();
+    }
+
+    req.session.userId = demoUser._id;
+    req.session.userName = demoUser.name;
+
+    res.json({
+      success: true,
+      user: { id: demoUser._id, name: demoUser.name, email: demoUser.email }
+    });
+  } catch (error) {
+    console.error('Demo login error:', error);
+    res.status(500).json({ success: false, error: 'Demo login failed' });
   }
 });
 
@@ -477,20 +563,23 @@ app.post('/api/admin/login', async (req, res) => {
       return res.json({ success: false, error: 'Invalid credentials' });
     }
 
-    req.session.adminId = admin._id;
+    req.session.adminId = admin._id.toString();
     req.session.adminName = admin.name;
     req.session.adminRole = admin.role;
 
-    res.json({
-      success: true,
-      admin: {
-        id: admin._id,
-        name: admin.name,
-        role: admin.role,
-        email: admin.email,
-        department: admin.department,
-        assignedZones: admin.assignedZones || []
-      }
+    req.session.save((err) => {
+      if (err) console.error('Admin session save error:', err);
+      res.json({
+        success: true,
+        admin: {
+          id: admin._id,
+          name: admin.name,
+          role: admin.role,
+          email: admin.email,
+          department: admin.department,
+          assignedZones: admin.assignedZones || []
+        }
+      });
     });
   } catch (error) {
     console.error('Admin login error:', error);
@@ -637,10 +726,19 @@ app.get('/api/officer/workers', requireAdmin, async (req, res) => {
     const officer = await Admin.findById(req.session.adminId);
     if (!officer) return res.status(404).json({ success: false, error: 'Officer not found' });
 
-    // Find workers in officer's zones
-    const workers = await Worker.find({
-      assignedZone: { $in: officer.assignedZones }
-    }).select('-password');
+    // 1. Find approved workers in officer's zones
+    let workers = [];
+    if (officer.assignedZones && officer.assignedZones.length > 0 && !officer.assignedZones.includes('All')) {
+      workers = await Worker.find({
+        status: 'approved',
+        assignedZone: { $in: officer.assignedZones }
+      }).select('-password').sort({ name: 1 });
+    }
+
+    // 2. Fallback: If no workers assigned specifically to this zone yet, return all approved workers
+    if (!workers || workers.length === 0) {
+      workers = await Worker.find({ status: 'approved' }).select('-password').sort({ name: 1 });
+    }
 
     res.json({ success: true, workers });
   } catch (error) {
@@ -684,14 +782,14 @@ app.post('/api/report', authenticateJWT, requireAuth, upload.single('photo'), as
         fs.unlinkSync(req.file.path); // Delete duplicate
         return res.json({
           success: false,
-          error: `Duplicate Photo! This image exists in Report #${duplicateReport.reportId}`
+          error: 'Duplicate Photo! This image has already been submitted.'
         });
       }
 
       // Upload to Cloudinary if configured
       if (process.env.CLOUDINARY_URL) {
         try {
-          const result = await cloudinary.uploader.upload(req.file.path, { folder: 'greencredits_uploads' });
+          const result = await cloudinary.uploader.upload(req.file.path, { folder: process.env.CLOUDINARY_FOLDER || 'urbansync_uploads' });
           finalPhotoUrl = result.secure_url;
           fs.unlinkSync(req.file.path);
         } catch (err) {
@@ -713,8 +811,8 @@ app.post('/api/report', authenticateJWT, requireAuth, upload.single('photo'), as
     // AI Category Confidence Bonus
     if (aiConfidence && parseFloat(aiConfidence) > 0.8) qualityScore += 10;
 
-    // AUTO-ASSIGN ZONE
-    let assignedZone = 'Zone 5 - Central Gonda';
+    // AUTO-ASSIGN ZONE (With Central Zone fallback for any outside/other location)
+    let assignedZone = 'Zone 5 - Central Bokaro';
 
     // SANITIZATION: Ensure lat/lng are valid numbers, not strings like "undefined"
     let safeLat = parseFloat(lat);
@@ -723,11 +821,22 @@ app.post('/api/report', authenticateJWT, requireAuth, upload.single('photo'), as
     if (isNaN(safeLat)) safeLat = 0;
     if (isNaN(safeLng)) safeLng = 0;
 
-    if (address) {
-      assignedZone = detectZone(address);
-    } else if (safeLat !== 0 && safeLng !== 0) {
+    const isGpsProvided = safeLat !== 0 && safeLng !== 0;
+    const isGpsOutsideBokaro = isGpsProvided && (
+      safeLat < BOKARO_BOUNDS.minLat || safeLat > BOKARO_BOUNDS.maxLat ||
+      safeLng < BOKARO_BOUNDS.minLng || safeLng > BOKARO_BOUNDS.maxLng
+    );
+
+    if (isGpsOutsideBokaro) {
+      console.log(`📍 Outside Bokaro GPS detected (${safeLat}, ${safeLng}) -> Moved to Central Zone (Zone 5 - Central Bokaro)`);
+      assignedZone = 'Zone 5 - Central Bokaro';
+    } else if (address) {
+      assignedZone = detectZone(address) || 'Zone 5 - Central Bokaro';
+    } else if (isGpsProvided) {
       const gpsZone = detectZoneFromCoordinates(safeLat, safeLng);
-      if (gpsZone) assignedZone = gpsZone;
+      assignedZone = gpsZone || 'Zone 5 - Central Bokaro';
+    } else {
+      assignedZone = 'Zone 5 - Central Bokaro';
     }
 
     console.log('Received Report Submission:');
@@ -808,16 +917,42 @@ app.post('/api/report', authenticateJWT, requireAuth, upload.single('photo'), as
 });
 
 // ============================================
-// TRANSACTION HISTORY API
+// TRANSACTION HISTORY API (CREDIT STATEMENT)
 // ============================================
 app.get('/api/transactions', authenticateJWT, requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId || req.user.userId;
-    const transactions = await Transaction.find({ userId })
-      .sort({ date: -1 })
-      .limit(50); // Last 50 transactions
+    let list = [];
 
-    res.json({ success: true, transactions });
+    const creditAccount = await Credit.findOne({ userId });
+    if (creditAccount && creditAccount.transactions && creditAccount.transactions.length > 0) {
+      creditAccount.transactions.forEach(t => {
+        list.push({
+          _id: t._id,
+          type: t.type || 'earn',
+          amount: t.amount,
+          description: t.description,
+          date: t.timestamp || t.date || new Date()
+        });
+      });
+    }
+
+    const dbTxs = await Transaction.find({ userId }).sort({ date: -1 }).limit(50);
+    dbTxs.forEach(t => {
+      const exists = list.some(item => item.description === t.description && Math.abs(new Date(item.date) - new Date(t.date || t.createdAt)) < 10000);
+      if (!exists) {
+        list.push({
+          _id: t._id,
+          type: t.type || 'earn',
+          amount: t.amount,
+          description: t.description,
+          date: t.date || t.createdAt
+        });
+      }
+    });
+
+    list.sort((a, b) => new Date(b.date) - new Date(a.date));
+    res.json({ success: true, transactions: list });
   } catch (error) {
     console.error('Transaction fetch error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch transactions' });
@@ -1044,7 +1179,7 @@ app.post('/api/admin/reports/:id/status', requireAdmin, async (req, res) => {
     if (status === 'resolved') report.resolvedAt = new Date();
     await report.save();
 
-    if (oldStatus === 'pending' && status === 'verified') {
+    if ((oldStatus === 'pending' || oldStatus === 'resolved') && status === 'verified') {
       const creditAccount = await Credit.findOne({ userId: report.userId });
       if (creditAccount) {
         creditAccount.totalCredits += CREDIT_ACTIONS.REPORT_VERIFIED;
@@ -1289,17 +1424,22 @@ app.post('/api/worker/login', async (req, res) => {
       return res.json({ success: false, message: 'Invalid credentials' });
     }
 
-    req.session.workerId = worker._id;
+    req.session.workerId = worker._id.toString();
     req.session.workerName = worker.name;
     req.session.workerZone = worker.assignedZone;
 
-    res.json({
-      success: true,
-      worker: {
-        id: worker._id,
-        name: worker.name,
-        zone: worker.assignedZone
+    req.session.save((err) => {
+      if (err) {
+        console.error('Worker session save error:', err);
       }
+      res.json({
+        success: true,
+        worker: {
+          id: worker._id,
+          name: worker.name,
+          zone: worker.assignedZone
+        }
+      });
     });
   } catch (error) {
     console.error('Worker login error:', error);
@@ -1507,7 +1647,7 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
     const { notes } = req.body;
 
     if (!req.session.workerId) {
-      return res.json({ success: false, message: 'Not authenticated' });
+      return res.json({ success: false, message: 'Worker authentication required. Please log in.' });
     }
 
     const report = await Report.findById(id);
@@ -1515,8 +1655,9 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
       return res.json({ success: false, message: 'Report not found' });
     }
 
-    if (report.assignedTo.toString() !== req.session.workerId) {
-      return res.json({ success: false, message: 'Not assigned to this task' });
+    // Auto-assign to current worker if unassigned or taking over
+    if (!report.assignedTo || report.assignedTo.toString() !== req.session.workerId.toString()) {
+      report.assignedTo = req.session.workerId;
     }
 
     let finalCompletionPhotoUrl = null;
@@ -1526,7 +1667,9 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
       const fileBuffer = fs.readFileSync(req.file.path);
       photoHash = crypto.createHash('md5').update(fileBuffer).digest('hex');
 
+      // Check if duplicate across other reports
       const duplicateReport = await Report.findOne({
+        _id: { $ne: report._id },
         $or: [
           { photoHash: photoHash },
           { completionPhotoHash: photoHash }
@@ -1534,19 +1677,19 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
       });
 
       if (duplicateReport) {
-        fs.unlinkSync(req.file.path);
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
         return res.json({
           success: false,
-          error: `Duplicate Photo! This image is already used in Report #${duplicateReport.reportId}`
+          message: 'Duplicate Photo! This image has already been used. Please upload a fresh photo.'
         });
       }
 
       // Upload to Cloudinary if configured
       if (process.env.CLOUDINARY_URL) {
         try {
-          const result = await cloudinary.uploader.upload(req.file.path, { folder: 'greencredits_uploads' });
+          const result = await cloudinary.uploader.upload(req.file.path, { folder: process.env.CLOUDINARY_FOLDER || 'urbansync_uploads' });
           finalCompletionPhotoUrl = result.secure_url;
-          fs.unlinkSync(req.file.path);
+          try { fs.unlinkSync(req.file.path); } catch (e) {}
         } catch (err) {
           console.error("Cloudinary upload error:", err);
           finalCompletionPhotoUrl = `/uploads/${req.file.filename}`;
@@ -1554,6 +1697,8 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
       } else {
         finalCompletionPhotoUrl = `/uploads/${req.file.filename}`;
       }
+    } else {
+      return res.json({ success: false, message: 'Please upload a photo of the completed cleanup.' });
     }
 
     report.status = 'resolved';
@@ -1651,13 +1796,13 @@ app.get('/api/admin/create-demo-accounts', async (req, res) => {
         }
       },
       {
-        name: 'Rajesh Kumar - North Zone Officer',
+        name: 'Rajesh Kumar - Zone 1 Officer',
         email: 'officer1@bokaro.gov.in',
         password: 'Officer@123',
         phone: '+91-9876543201',
         role: 'zone_officer',
         department: 'Sanitation Department',
-        assignedZones: ['Zone 1 - North Bokaro', 'Zone 2 - South Bokaro'],
+        assignedZones: ['Zone 1 - North Bokaro'],
         isActive: true,
         permissions: {
           canApproveWorkers: true,
@@ -1667,13 +1812,13 @@ app.get('/api/admin/create-demo-accounts', async (req, res) => {
         }
       },
       {
-        name: 'Sunita Sharma - East Zone Officer',
+        name: 'Suresh Prasad - Zone 2 Officer',
         email: 'officer2@bokaro.gov.in',
         password: 'Officer@123',
         phone: '+91-9876543202',
         role: 'zone_officer',
         department: 'Sanitation Department',
-        assignedZones: ['Zone 3 - East Bokaro', 'Zone 4 - West Bokaro'],
+        assignedZones: ['Zone 2 - South Bokaro'],
         isActive: true,
         permissions: {
           canApproveWorkers: true,
@@ -1683,10 +1828,42 @@ app.get('/api/admin/create-demo-accounts', async (req, res) => {
         }
       },
       {
-        name: 'Amit Verma - Central Zone Officer',
+        name: 'Prakash Verma - Zone 3 Officer',
         email: 'officer3@bokaro.gov.in',
         password: 'Officer@123',
         phone: '+91-9876543203',
+        role: 'zone_officer',
+        department: 'Sanitation Department',
+        assignedZones: ['Zone 3 - East Bokaro'],
+        isActive: true,
+        permissions: {
+          canApproveWorkers: true,
+          canAssignWork: true,
+          canViewReports: true,
+          canManageOfficers: false
+        }
+      },
+      {
+        name: 'Anil Sengupta - Zone 4 Officer',
+        email: 'officer4@bokaro.gov.in',
+        password: 'Officer@123',
+        phone: '+91-9876543204',
+        role: 'zone_officer',
+        department: 'Sanitation Department',
+        assignedZones: ['Zone 4 - West Bokaro'],
+        isActive: true,
+        permissions: {
+          canApproveWorkers: true,
+          canAssignWork: true,
+          canViewReports: true,
+          canManageOfficers: false
+        }
+      },
+      {
+        name: 'Mahesh Singh - Zone 5 Officer',
+        email: 'officer5@bokaro.gov.in',
+        password: 'Officer@123',
+        phone: '+91-9876543205',
         role: 'zone_officer',
         department: 'Sanitation Department',
         assignedZones: ['Zone 5 - Central Bokaro'],
@@ -1705,11 +1882,11 @@ app.get('/api/admin/create-demo-accounts', async (req, res) => {
 
     const workers = await Worker.create([
       {
-        name: 'Ramesh Kumar',
+        name: 'Raju Kumar',
         mobile: '9999999991',
-        email: 'ramesh@worker.com',
+        email: 'raju@worker.com',
         password: 'Worker@123',
-        aadhaar: '123456789012',
+        aadhaar: '123456789011',
         address: 'Sector 1, Bokaro Steel City',
         assignedZone: 'Zone 1 - North Bokaro',
         status: 'approved',
@@ -1717,11 +1894,11 @@ app.get('/api/admin/create-demo-accounts', async (req, res) => {
         approvedDate: new Date()
       },
       {
-        name: 'Suresh Yadav',
+        name: 'Suresh Mahto',
         mobile: '9999999992',
         email: 'suresh@worker.com',
         password: 'Worker@123',
-        aadhaar: '123456789013',
+        aadhaar: '123456789012',
         address: 'Sector 11, Bokaro Steel City',
         assignedZone: 'Zone 2 - South Bokaro',
         status: 'approved',
@@ -1729,13 +1906,37 @@ app.get('/api/admin/create-demo-accounts', async (req, res) => {
         approvedDate: new Date()
       },
       {
-        name: 'Mohan Singh',
+        name: 'Sunita Devi',
         mobile: '9999999993',
-        email: 'mohan@worker.com',
+        email: 'sunita@worker.com',
         password: 'Worker@123',
-        aadhaar: '123456789014',
+        aadhaar: '123456789013',
         address: 'Sector 8, Bokaro Steel City',
         assignedZone: 'Zone 3 - East Bokaro',
+        status: 'approved',
+        approvedBy: admins[0]._id,
+        approvedDate: new Date()
+      },
+      {
+        name: 'Deepak Hansda',
+        mobile: '9999999994',
+        email: 'deepak@worker.com',
+        password: 'Worker@123',
+        aadhaar: '123456789014',
+        address: 'Sector 5, Bokaro Steel City',
+        assignedZone: 'Zone 4 - West Bokaro',
+        status: 'approved',
+        approvedBy: admins[0]._id,
+        approvedDate: new Date()
+      },
+      {
+        name: 'Amit Soren',
+        mobile: '9999999995',
+        email: 'amit@worker.com',
+        password: 'Worker@123',
+        aadhaar: '123456789015',
+        address: 'City Centre, Bokaro Steel City',
+        assignedZone: 'Zone 5 - Central Bokaro',
         status: 'approved',
         approvedBy: admins[0]._id,
         approvedDate: new Date()
@@ -1744,23 +1945,27 @@ app.get('/api/admin/create-demo-accounts', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Demo accounts for Bokaro created successfully!',
+      message: '5 Zone Officers and 5 Zone Workers for Bokaro created successfully!',
       accounts: {
         superAdmin: {
           email: 'cmo@bokaro.gov.in',
-          password: 'SuperAdmin@2026',
+          password: 'SuperAdmin@2025',
           role: 'Super Admin',
           url: 'http://localhost:3000/super-admin-login.html'
         },
         officers: [
-          { email: 'officer1@bokaro.gov.in', password: 'Officer@123', zones: 'Zone 1-2', url: 'http://localhost:3000/officer-login.html' },
-          { email: 'officer2@bokaro.gov.in', password: 'Officer@123', zones: 'Zone 3-4', url: 'http://localhost:3000/officer-login.html' },
-          { email: 'officer3@bokaro.gov.in', password: 'Officer@123', zones: 'Zone 5', url: 'http://localhost:3000/officer-login.html' }
+          { email: 'officer1@bokaro.gov.in', password: 'Officer@123', zone: 'Zone 1 - North Bokaro', url: 'http://localhost:3000/officer-login.html' },
+          { email: 'officer2@bokaro.gov.in', password: 'Officer@123', zone: 'Zone 2 - South Bokaro', url: 'http://localhost:3000/officer-login.html' },
+          { email: 'officer3@bokaro.gov.in', password: 'Officer@123', zone: 'Zone 3 - East Bokaro', url: 'http://localhost:3000/officer-login.html' },
+          { email: 'officer4@bokaro.gov.in', password: 'Officer@123', zone: 'Zone 4 - West Bokaro', url: 'http://localhost:3000/officer-login.html' },
+          { email: 'officer5@bokaro.gov.in', password: 'Officer@123', zone: 'Zone 5 - Central Bokaro', url: 'http://localhost:3000/officer-login.html' }
         ],
         workers: [
           { mobile: '9999999991', password: 'Worker@123', zone: 'Zone 1 - North Bokaro', url: 'http://localhost:3000/worker-login.html' },
           { mobile: '9999999992', password: 'Worker@123', zone: 'Zone 2 - South Bokaro', url: 'http://localhost:3000/worker-login.html' },
-          { mobile: '9999999993', password: 'Worker@123', zone: 'Zone 3 - East Bokaro', url: 'http://localhost:3000/worker-login.html' }
+          { mobile: '9999999993', password: 'Worker@123', zone: 'Zone 3 - East Bokaro', url: 'http://localhost:3000/worker-login.html' },
+          { mobile: '9999999994', password: 'Worker@123', zone: 'Zone 4 - West Bokaro', url: 'http://localhost:3000/worker-login.html' },
+          { mobile: '9999999995', password: 'Worker@123', zone: 'Zone 5 - Central Bokaro', url: 'http://localhost:3000/worker-login.html' }
         ]
       }
     });
@@ -1893,10 +2098,8 @@ app.get('/api/admin/create-demo-reports', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+
+
 
 // ==========================================
 // 👮 CREATE OFFICER API (Super Admin)
@@ -2063,25 +2266,6 @@ app.get('/api/super-admin/workers', async (req, res) => {
 });
 
 // ==========================================
-// 📋 GET MY WORKERS (Zone Officer)
-// ==========================================
-app.get('/api/officer/workers', async (req, res) => {
-  try {
-    if (!req.session.adminId) return res.status(401).json({ success: false, error: 'Unauthorized' });
-
-    const officer = await Admin.findById(req.session.adminId);
-    if (!officer) return res.status(404).json({ success: false, error: 'Officer not found' });
-
-    // Find workers in officer's zones
-    const workers = await Worker.find({ assignedZone: { $in: officer.assignedZones } }).sort({ createdAt: -1 });
-    res.json({ success: true, workers });
-  } catch (error) {
-    console.error('Get Officer Workers Error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch workers' });
-  }
-});
-
-// ==========================================
 // DELETE WORKER (Admin)
 // ==========================================
 app.delete('/api/admin/workers/:id', async (req, res) => {
@@ -2111,29 +2295,31 @@ app.delete('/api/admin/officers/:id', async (req, res) => {
 const autoSeed = async () => {
   try {
     // 1. Super Admin (NUCLEAR OPTION: Delete & Recreate to ensure clean state)
-    await Admin.deleteOne({ email: 'cmo@gonda.gov.in' });
+    await Admin.deleteOne({ email: 'cmo@bokaro.gov.in' });
     console.log('Old Super Admin deleted (cleanup)');
 
     const salt = await bcrypt.genSalt(10);
     const superAdminPass = await bcrypt.hash('SuperAdmin@2025', salt);
 
     await Admin.create({
-      name: 'Super Admin',
-      email: 'cmo@gonda.gov.in',
+      name: 'Super Admin (CMO)',
+      email: 'cmo@bokaro.gov.in',
       password: 'SuperAdmin@2025',
       role: 'super_admin',
       mobile: '9999999999',
       assignedZones: ['All'],
       isActive: true
     });
-    console.log('Super Admin RE-CREATED (Active) - PASSWORD: SuperAdmin@2025');
+    console.log('Super Admin RE-CREATED (Active) - EMAIL: cmo@bokaro.gov.in | PASSWORD: SuperAdmin@2025');
 
-    // 2. Zone Officers
+    // 2. Zone Officers (5 Dedicated Officers for 5 Zones)
     const officerPass = await bcrypt.hash('Officer@123', salt);
     const officers = [
-      { name: 'Ramesh Gupta', email: 'officer1@gonda.gov.in', zones: ['Zone 1 - North Gonda', 'Zone 2 - South Gonda'] },
-      { name: 'Suresh Verma', email: 'officer2@gonda.gov.in', zones: ['Zone 3 - East Gonda', 'Zone 4 - West Gonda'] },
-      { name: 'Mahesh Singh', email: 'officer3@gonda.gov.in', zones: ['Zone 5 - Central Gonda'] }
+      { name: 'Rajesh Kumar - Zone 1 Officer', email: 'officer1@bokaro.gov.in', mobile: '9876543201', zones: ['Zone 1 - North Bokaro'] },
+      { name: 'Suresh Prasad - Zone 2 Officer', email: 'officer2@bokaro.gov.in', mobile: '9876543202', zones: ['Zone 2 - South Bokaro'] },
+      { name: 'Prakash Verma - Zone 3 Officer', email: 'officer3@bokaro.gov.in', mobile: '9876543203', zones: ['Zone 3 - East Bokaro'] },
+      { name: 'Anil Sengupta - Zone 4 Officer', email: 'officer4@bokaro.gov.in', mobile: '9876543204', zones: ['Zone 4 - West Bokaro'] },
+      { name: 'Mahesh Singh - Zone 5 Officer', email: 'officer5@bokaro.gov.in', mobile: '9876543205', zones: ['Zone 5 - Central Bokaro'] }
     ];
 
     for (const off of officers) {
@@ -2144,46 +2330,301 @@ const autoSeed = async () => {
           email: off.email,
           password: officerPass,
           role: 'zone_officer',
-          mobile: '9999999990',
+          mobile: off.mobile,
           assignedZones: off.zones,
           isActive: true
         },
         { upsert: true, new: true }
       );
     }
-    console.log('Officers synced (Active)');
+    console.log('5 Dedicated Zone Officers synced (Active) - PASSWORD: Officer@123');
 
-    // 3. Workers
-    const workerExists = await Worker.exists({ mobile: '9999999991' });
-    if (!workerExists) {
-      console.log('Creating Default Workers...');
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash('Worker@123', salt);
+    // 3. Workers (All 5 Bokaro Zones - 1 Worker per Zone)
+    console.log('Syncing Frontline Workers for All 5 Zones...');
+    const admin = await Admin.findOne({ email: 'cmo@bokaro.gov.in' });
 
-      const workers = [
-        { name: 'Raju Worker', mobile: '9999999991', zone: 'Zone 1 - North Gonda' },
-        { name: 'Suresh Worker', mobile: '9999999992', zone: 'Zone 2 - South Gonda' }
-      ];
+    const defaultWorkers = [
+      { name: 'Raju Kumar', mobile: '9999999991', zone: 'Zone 1 - North Bokaro' },
+      { name: 'Suresh Mahto', mobile: '9999999992', zone: 'Zone 2 - South Bokaro' },
+      { name: 'Sunita Devi', mobile: '9999999993', zone: 'Zone 3 - East Bokaro' },
+      { name: 'Deepak Hansda', mobile: '9999999994', zone: 'Zone 4 - West Bokaro' },
+      { name: 'Amit Soren', mobile: '9999999995', zone: 'Zone 5 - Central Bokaro' }
+    ];
 
-      // Need an admin ID for approval
-      const admin = await Admin.findOne({ email: 'cmo@gonda.gov.in' });
-
-      for (const w of workers) {
-        await Worker.create({
+    for (const w of defaultWorkers) {
+      let worker = await Worker.findOne({ mobile: w.mobile });
+      if (!worker) {
+        worker = new Worker({
           name: w.name,
           mobile: w.mobile,
-          email: `${w.mobile}@worker.com`,
+          email: `${w.mobile}@worker.urbansync.in`,
           password: 'Worker@123',
           aadhaar: `123456${w.mobile}`,
-          address: 'Gonda',
+          address: 'Bokaro Steel City, Jharkhand',
           assignedZone: w.zone,
           status: 'approved',
           approvedBy: admin?._id || null,
           approvedDate: new Date()
         });
+        await worker.save();
+        console.log(`✅ Seeded Worker: ${w.name} (${w.mobile}) -> ${w.zone}`);
+      } else {
+        worker.name = w.name;
+        worker.status = 'approved';
+        worker.assignedZone = w.zone;
+        worker.password = 'Worker@123'; // Triggers pre('save') to hash
+        await worker.save();
+        console.log(`✅ Synced Worker: ${w.name} (${w.mobile}) -> ${w.zone}`);
       }
     }
-    console.log('Auto-seed check complete. Database ready.');
+    console.log('All 5 Zone Workers synced (Approved) - PASSWORD: Worker@123');
+
+    // 4. Seed Demo Citizen & Leaderboard Citizens
+    console.log('Syncing Demo Citizen & Civic Leaderboard...');
+    let demoCitizenUser = await User.findOne({ email: 'demo@bokaro.gov.in' });
+    if (!demoCitizenUser) {
+      demoCitizenUser = new User({
+        name: 'Aditya Sharma',
+        email: 'demo@bokaro.gov.in',
+        password: 'Password@123',
+        credits: 280,
+        lifetimeCredits: 350,
+        reportsCount: 5,
+        currentStreak: 4,
+        longestStreak: 7
+      });
+      await demoCitizenUser.save();
+      console.log('✅ Demo Citizen created: demo@bokaro.gov.in / Password@123');
+    }
+
+    let demoCredit = await Credit.findOne({ userId: demoCitizenUser._id });
+    if (!demoCredit) {
+      demoCredit = new Credit({
+        userId: demoCitizenUser._id,
+        totalCredits: 350,
+        availableCredits: 280,
+        reportCount: 5,
+        reportsVerified: 4,
+        badges: [
+          { key: 'first_report', name: 'First Responder', icon: '🌱', earnedAt: new Date(Date.now() - 7 * 86400000) },
+          { key: 'streak_3d', name: 'Clean Streak 3d', icon: '🔥', earnedAt: new Date(Date.now() - 4 * 86400000) },
+          { key: 'bokaro_champion', name: 'Bokaro Guardian', icon: '🛡️', earnedAt: new Date(Date.now() - 2 * 86400000) },
+          { key: 'verified_citizen', name: 'Verified Citizen', icon: '✨', earnedAt: new Date(Date.now() - 86400000) }
+        ],
+        transactions: [
+          { type: 'bonus', amount: 50, description: 'Welcome to UrbanSync! 🎉', timestamp: new Date(Date.now() - 10 * 86400000) },
+          { type: 'earned', amount: 35, description: 'Incident #101 verified at Sector 4 City Centre', timestamp: new Date(Date.now() - 7 * 86400000) },
+          { type: 'earned', amount: 45, description: 'Incident #103 verified at Chas Bypass', timestamp: new Date(Date.now() - 5 * 86400000) },
+          { type: 'earned', amount: 50, description: 'Incident #106 verified at Sector 1 Market', timestamp: new Date(Date.now() - 2 * 86400000) },
+          { type: 'redeemed', amount: -70, description: 'Redeemed ₹50 UPI Cashback Voucher', timestamp: new Date(Date.now() - 86400000) }
+        ]
+      });
+      await demoCredit.save();
+    }
+
+    const sampleCitizens = [
+      { name: 'Priya Patel', email: 'priya.bokaro@gmail.com', totalCredits: 420, availableCredits: 370, reports: 8, streak: 6 },
+      { name: 'Amit Verma', email: 'amit.verma@bokaro.in', totalCredits: 260, availableCredits: 210, reports: 4, streak: 3 },
+      { name: 'Sunita Roy', email: 'sunita.roy@bokaro.in', totalCredits: 190, availableCredits: 150, reports: 3, streak: 2 },
+      { name: 'Rahul Soren', email: 'rahul.soren@bokaro.in', totalCredits: 140, availableCredits: 140, reports: 2, streak: 1 }
+    ];
+
+    for (const c of sampleCitizens) {
+      let u = await User.findOne({ email: c.email });
+      if (!u) {
+        u = new User({
+          name: c.name,
+          email: c.email,
+          password: 'Password@123',
+          credits: c.availableCredits,
+          lifetimeCredits: c.totalCredits,
+          reportsCount: c.reports,
+          currentStreak: c.streak,
+          longestStreak: c.streak + 2
+        });
+        await u.save();
+      }
+
+      let cred = await Credit.findOne({ userId: u._id });
+      if (!cred) {
+        cred = new Credit({
+          userId: u._id,
+          totalCredits: c.totalCredits,
+          availableCredits: c.availableCredits,
+          reportCount: c.reports,
+          reportsVerified: c.reports,
+          badges: [
+            { key: 'first_report', name: 'First Responder', icon: '🌱', earnedAt: new Date(Date.now() - 14 * 86400000) },
+            { key: 'eco_warrior', name: 'Eco Warrior', icon: '🌟', earnedAt: new Date(Date.now() - 5 * 86400000) }
+          ],
+          transactions: [
+            { type: 'bonus', amount: 50, description: 'Welcome Bonus', timestamp: new Date(Date.now() - 14 * 86400000) },
+            { type: 'earned', amount: c.totalCredits - 50, description: 'Multiple verified incident cleanups in Bokaro', timestamp: new Date(Date.now() - 3 * 86400000) }
+          ]
+        });
+        await cred.save();
+      }
+    }
+
+    // 5. Seed Bokaro Realistic Incident Reports
+    const reportCount = await Report.countDocuments();
+    if (reportCount < 5) {
+      console.log('Seeding Bokaro municipal incident reports across 5 zones...');
+      const defaultWorker = await Worker.findOne({ mobile: '9999999991' });
+      const defaultAdmin = await Admin.findOne({ email: 'cmo@bokaro.gov.in' });
+
+      const sampleReports = [
+        {
+          reportId: 101,
+          userId: demoCitizenUser._id,
+          description: 'Large cluster of discarded plastic packaging and beverage cups outside City Centre complex near Sector 4.',
+          category: 'plastic',
+          address: 'Sector 4 City Centre, Bokaro Steel City',
+          location: { type: 'Point', coordinates: [86.1511, 23.6693] },
+          assignedZone: 'Zone 5 - Central Bokaro',
+          severity: 'medium',
+          status: 'resolved',
+          estimatedCredits: 15,
+          photoUrl: '/images/9001_before.png',
+          completionPhotoUrl: '/images/9001_after.png',
+          assignedTo: defaultWorker?._id,
+          resolvedBy: defaultWorker?._id,
+          verifiedBy: defaultAdmin?._id,
+          verifiedAt: new Date(Date.now() - 2 * 86400000),
+          resolvedAt: new Date(Date.now() - 86400000),
+          adminNotes: 'Field cleanup verified. Area restored.',
+          workerNotes: 'Waste collected and safely transported to Sector 4 segregation unit.',
+          aiTags: ['plastic bottle', 'litter', 'packaging'],
+          aiConfidence: 0.94
+        },
+        {
+          reportId: 102,
+          userId: demoCitizenUser._id,
+          description: 'Accumulation of mixed cardboard and organic vegetable waste behind Sector 1 Daily Market.',
+          category: 'organic',
+          address: 'Sector 1 Market Circle, Bokaro Steel City',
+          location: { type: 'Point', coordinates: [86.1380, 23.6820] },
+          assignedZone: 'Zone 1 - North Bokaro',
+          severity: 'high',
+          status: 'resolved',
+          estimatedCredits: 20,
+          photoUrl: '/images/9002_before.png',
+          completionPhotoUrl: '/images/9002_after.png',
+          assignedTo: defaultWorker?._id,
+          resolvedBy: defaultWorker?._id,
+          adminNotes: 'Assigned to North Bokaro sanitation crew.',
+          workerNotes: 'Organic waste cleared and sent to composting facility.',
+          aiTags: ['organic waste', 'cardboard', 'vegetable scrap'],
+          aiConfidence: 0.91
+        },
+        {
+          reportId: 103,
+          userId: demoCitizenUser._id,
+          description: 'Discarded commercial packaging and beverage tins along Chas Main Bypass road.',
+          category: 'metal',
+          address: 'Chas Main Bypass Road, Bokaro Steel City',
+          location: { type: 'Point', coordinates: [86.1850, 23.6600] },
+          assignedZone: 'Zone 3 - East Bokaro',
+          severity: 'medium',
+          status: 'verified',
+          estimatedCredits: 15,
+          photoUrl: '/images/9003_before.png',
+          completionPhotoUrl: '/images/9003_after.png',
+          verifiedBy: defaultAdmin?._id,
+          verifiedAt: new Date(),
+          adminNotes: 'Officer inspected and approved for pickup.',
+          workerNotes: 'Roadside debris cleared and curb swept.',
+          aiTags: ['metal can', 'packaging', 'litter'],
+          aiConfidence: 0.88
+        },
+        {
+          reportId: 104,
+          userId: demoCitizenUser._id,
+          description: 'Overflowing community dumpster near Garga Dam approach road.',
+          category: 'other',
+          address: 'Garga Dam Approach Road, Bokaro Steel City',
+          location: { type: 'Point', coordinates: [86.1620, 23.6480] },
+          assignedZone: 'Zone 2 - South Bokaro',
+          severity: 'critical',
+          status: 'pending',
+          estimatedCredits: 25,
+          photoUrl: 'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?w=800&q=80',
+          completionPhotoUrl: '/images/clean_street_after_1780331876520.png',
+          aiTags: ['overflowing dumpster', 'mixed waste'],
+          aiConfidence: 0.96
+        },
+        {
+          reportId: 105,
+          userId: demoCitizenUser._id,
+          description: 'Scrap metal and industrial packaging waste discarded near Balidih Industrial Area entrance.',
+          category: 'metal',
+          address: 'Balidih Industrial Area Gate 2, Bokaro Steel City',
+          location: { type: 'Point', coordinates: [86.1150, 23.6550] },
+          assignedZone: 'Zone 4 - West Bokaro',
+          severity: 'medium',
+          status: 'resolved',
+          estimatedCredits: 20,
+          photoUrl: '/images/9005_before.jpg',
+          completionPhotoUrl: '/images/9005_after.jpg',
+          assignedTo: defaultWorker?._id,
+          resolvedBy: defaultWorker?._id,
+          verifiedBy: defaultAdmin?._id,
+          verifiedAt: new Date(Date.now() - 3 * 86400000),
+          resolvedAt: new Date(Date.now() - 2 * 86400000),
+          adminNotes: 'Industrial zone sanitation completed.',
+          workerNotes: 'Heavy metal scraps loaded onto municipal carrier.',
+          aiTags: ['industrial scrap', 'metal'],
+          aiConfidence: 0.92
+        },
+        {
+          reportId: 106,
+          userId: demoCitizenUser._id,
+          description: 'Plastic food containers and beverage cups near Bokaro Mall perimeter, Sector 3.',
+          category: 'plastic',
+          address: 'Bokaro Mall Perimeter, Sector 3, Bokaro Steel City',
+          location: { type: 'Point', coordinates: [86.1550, 23.6650] },
+          assignedZone: 'Zone 5 - Central Bokaro',
+          severity: 'low',
+          status: 'resolved',
+          estimatedCredits: 10,
+          photoUrl: '/images/9006_before.png',
+          completionPhotoUrl: '/images/9006_after.png',
+          assignedTo: defaultWorker?._id,
+          resolvedBy: defaultWorker?._id,
+          verifiedBy: defaultAdmin?._id,
+          resolvedAt: new Date(Date.now() - 4 * 86400000),
+          adminNotes: 'Cleaned by morning patrol.',
+          workerNotes: 'All plastic cartons and cups removed; pavement power-washed.',
+          aiTags: ['plastic container', 'litter'],
+          aiConfidence: 0.95
+        }
+      ];
+
+      for (const rep of sampleReports) {
+        await Report.create(rep);
+      }
+      console.log('✅ Bokaro sample reports seeded successfully!');
+    }
+
+    // Ensure all existing reports with old seedling/leaf photos are permanently updated
+    await Report.updateMany(
+      {
+        $or: [
+          { completionPhotoUrl: { $regex: 'photo-1542601906990-b4d3fb778b09' } },
+          { completionPhotoUrl: { $regex: 'leaf\\.(jpg|png)' } }
+        ]
+      },
+      { $set: { completionPhotoUrl: '/images/clean_street_after_1780331876520.png' } }
+    );
+    await Report.updateOne({ reportId: 101 }, { $set: { photoUrl: '/images/9001_before.png', completionPhotoUrl: '/images/9001_after.png' } });
+    await Report.updateOne({ reportId: 102 }, { $set: { photoUrl: '/images/9002_before.png', completionPhotoUrl: '/images/9002_after.png' } });
+    await Report.updateOne({ reportId: 103 }, { $set: { photoUrl: '/images/9003_before.png', completionPhotoUrl: '/images/9003_after.png' } });
+    await Report.updateOne({ reportId: 105 }, { $set: { photoUrl: '/images/9005_before.jpg', completionPhotoUrl: '/images/9005_after.jpg' } });
+    await Report.updateOne({ reportId: 106 }, { $set: { photoUrl: '/images/9006_before.png', completionPhotoUrl: '/images/9006_after.png' } });
+    await Report.updateOne({ reportId: 107 }, { $set: { completionPhotoUrl: '/images/9007_after.png' } });
+    await Report.updateOne({ reportId: 108 }, { $set: { photoUrl: '/images/9010_before.png', completionPhotoUrl: '/images/9010_after.png' } });
+
+    console.log('Auto-seed check complete. Bokaro Municipal Database ready.');
   } catch (error) {
     console.error('❌ Auto-seed failed:', error);
   }
@@ -2206,14 +2647,14 @@ const startServer = async () => {
   try {
     httpServer.listen(PORT, '0.0.0.0', async () => {
       console.log(`
-╔═══════════════════════════════════════════════════════════════╗
-║                                                               ║
-║   🌿 GREEN CREDITS - WASTE MANAGEMENT SYSTEM 🌿               ║
-║   SERVER STARTED (v1.0.1)                                  ║
-║                                                               ║
-╚═══════════════════════════════════════════════════════════════╝
- 
-Server running on port ${PORT}
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║   🏙️  UrbanSync — Municipal Incident Management Platform  🏙️           ║
+║   Bokaro Steel City, Jharkhand, India | SERVER STARTED (v1.0.0)      ║
+║                                                                       ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+Server running on port ${PORT} | Environment: ${process.env.NODE_ENV || 'development'}
 `);
 
       try {

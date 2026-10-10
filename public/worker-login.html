@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+    <link rel="alternate icon" href="/favicon.svg?v=3">
+    <link rel="apple-touch-icon" href="/favicon.svg?v=3">
     <title>Worker Login — UrbanSync</title>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -238,10 +240,12 @@
             <p>Don't want to type? Use Quick Login</p>
             <div class="input-wrapper">
                 <select id="quickLoginSelect" onchange="fillCredentials()">
-                    <option value="">-- Select Demo Worker --</option>
-                    <option value="9999999991">Worker 1 (North Bokaro)</option>
-                    <option value="9999999992">Worker 2 (South Bokaro)</option>
-                    <option value="9999999993">Worker 3 (East Bokaro)</option>
+                    <option value="">-- Select Field Worker --</option>
+                    <option value="9999999991">Worker 1 — Zone 1: North Bokaro (9999999991)</option>
+                    <option value="9999999992">Worker 2 — Zone 2: South Bokaro (9999999992)</option>
+                    <option value="9999999993">Worker 3 — Zone 3: East Bokaro (9999999993)</option>
+                    <option value="9999999994">Worker 4 — Zone 4: West Bokaro (9999999994)</option>
+                    <option value="9999999995">Worker 5 — Zone 5: Central Bokaro (9999999995)</option>
                 </select>
                 <i class="fas fa-bolt"></i>
             </div>

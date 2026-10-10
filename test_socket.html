@@ -1,29 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Socket Test</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+    <link rel="alternate icon" href="/favicon.svg?v=3">
+    <link rel="apple-touch-icon" href="/favicon.svg?v=3">
+    <title>UrbanSync — Socket.io Connection Test</title>
 </head>
 <body>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <h2>🏙️ UrbanSync Socket.io Test</h2>
+    <p>Open browser console for detailed logs.</p>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io('https://green-credits-hmj9.onrender.com', {
+        // Connects to the UrbanSync server hosting this file
+        const socket = io(window.location.origin, {
             withCredentials: true,
             transports: ['websocket', 'polling']
         });
         
         socket.on('connect', () => {
             console.log('TEST_SOCKET_CONNECTED:', socket.id);
-            document.body.innerHTML += '<div>Connected: ' + socket.id + '</div>';
+            document.body.innerHTML += '<div style="color:green">✅ Connected to UrbanSync WebSocket: ' + socket.id + '</div>';
         });
         
         socket.on('connect_error', (err) => {
             console.error('TEST_SOCKET_ERROR:', err.message);
-            document.body.innerHTML += '<div style="color:red">Error: ' + err.message + '</div>';
+            document.body.innerHTML += '<div style="color:red">❌ Error: ' + err.message + '</div>';
         });
 
         socket.on('newReport', (data) => {
             console.log('TEST_NEW_REPORT:', data);
-            document.body.innerHTML += '<div style="color:green">Received newReport</div>';
+            document.body.innerHTML += '<div style="color:green">📍 Received newReport event</div>';
+        });
+
+        socket.on('reportUpdated', (data) => {
+            console.log('TEST_REPORT_UPDATED:', data);
+            document.body.innerHTML += '<div style="color:blue">🔄 Received reportUpdated event</div>';
         });
     </script>
 </body>

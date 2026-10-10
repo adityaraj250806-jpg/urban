@@ -6,11 +6,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://green-credits-hmj9.onrender.com/api/:path*"
+      "destination": "https://urbansync-app.onrender.com/api/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://green-credits-hmj9.onrender.com/uploads/:path*"
+      "destination": "https://urbansync-app.onrender.com/uploads/:path*"
     }
   ]
 }

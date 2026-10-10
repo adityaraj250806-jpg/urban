@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+    <link rel="alternate icon" href="/favicon.svg?v=3">
+    <link rel="apple-touch-icon" href="/favicon.svg?v=3">
     <title>Worker Dashboard | UrbanSync</title>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -658,9 +660,14 @@
             const notes = document.getElementById('completionNotes').value;
             const submitBtn = document.getElementById('submitProofBtn');
 
+            if (!photoInput.files || !photoInput.files[0]) {
+                Swal.fire('Proof Photo Required', 'Please select or capture a photo of the completed cleanup.', 'warning');
+                return;
+            }
+
             const formData = new FormData();
             formData.append('photo', photoInput.files[0]);
-            formData.append('notes', notes);
+            formData.append('notes', notes || '');
 
             try {
                 submitBtn.disabled = true;
@@ -674,14 +681,14 @@
 
                 if (data.success) {
                     closeModal('completionModal');
-                    Swal.fire('Great Job!', 'Task marked as completed. Pending Admin Verification.', 'success');
+                    Swal.fire('Great Job!', data.message || 'Task marked as completed. Pending Admin Verification.', 'success');
                     loadTasks();
                     switchTab('history'); // Move to history
                 } else {
-                    Swal.fire('Error', data.message, 'error');
+                    Swal.fire('Unable to Complete', data.message || data.error || 'Task completion failed. Please verify cleanup proof.', 'error');
                 }
             } catch (error) {
-                Swal.fire('Error', 'Upload failed. Check connection.', 'error');
+                Swal.fire('Error', 'Upload failed. Check network connection.', 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-upload"></i> Submit Proof';

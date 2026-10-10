@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+    <link rel="alternate icon" href="/favicon.svg?v=3">
+    <link rel="apple-touch-icon" href="/favicon.svg?v=3">
     <title>Zone Officer Dashboard — UrbanSync</title>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -701,12 +703,29 @@
 
         function updateWorkerDropdown() {
             const select = document.getElementById('workerSelect');
+            if (!select) return;
+            if (!workers || workers.length === 0) {
+                select.innerHTML = '<option value="">No workers found</option>';
+                return;
+            }
             select.innerHTML = '<option value="">Select a worker...</option>' +
-                workers.map(w => `<option value="${w._id}">${w.name} (${w.assignedZone})</option>`).join('');
+                workers.map(w => `<option value="${w._id}">${w.name} — ${w.assignedZone || 'All Zones'} (${w.mobile || ''})</option>`).join('');
         }
 
-        function openAssignModal(reportId) {
+        async function openAssignModal(reportId) {
             document.getElementById('assignReportId').value = reportId;
+            if (!workers || workers.length === 0) {
+                try {
+                    const res = await fetch('/api/officer/workers');
+                    const data = await res.json();
+                    if (data.success && data.workers) {
+                        workers = data.workers;
+                    }
+                } catch (e) {
+                    console.error('Failed to reload workers:', e);
+                }
+            }
+            updateWorkerDropdown();
             document.getElementById('assignModal').classList.add('active');
         }
 
@@ -844,7 +863,7 @@
                 const data = await response.json();
 
                 if (!data.success || data.workers.length === 0) {
-                    container.innerHTML = '<div style="padding:30px; text-align:center; color:#666;">No warriors in your team yet.</div>';
+                    container.innerHTML = '<div style="padding:30px; text-align:center; color:#666;">No workers assigned to this zone yet.</div>';
                     return;
                 }
 
@@ -954,7 +973,7 @@
             } catch (e) { alert('Connection error'); }
         }
     </script>
-    <script src="https://green-credits-hmj9.onrender.com/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         // Socket connection handled in DOMContentLoaded
 

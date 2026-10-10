@@ -5,7 +5,7 @@
 [![Security](https://img.shields.io/badge/Integrity-MD5%20Media%20Deduplication-6366f1?style=for-the-badge)](https://developer.mozilla.org)
 [![Node.js](https://img.shields.io/badge/Node.js-v24.x-339933?style=for-the-badge&logo=node.js)](https://nodejs.org)
 
-> **UrbanSync** is an enterprise-grade, event-driven municipal incident orchestration platform engineered for Indian smart cities. Configured for **Bokaro Steel City, Jharkhand**, UrbanSync integrates citizens, frontline sanitation workers (*Safai Karmacharis*), zonal municipal officers, and executive city leadership (*Super Admin / CMO*) into an automated, closed-loop incident lifecycle.
+> **UrbanSync** is an enterprise-grade, event-driven municipal incident orchestration platform engineered for Indian smart cities. Configured for **Bokaro Steel City, Jharkhand**, UrbanSync integrates citizens, frontline sanitation workers (*Field Workers*), zonal municipal officers, and executive city leadership (*Super Admin / CMO*) into an automated, closed-loop incident lifecycle.
 
 ---
 
@@ -39,7 +39,7 @@
 | Portal | Interface | Responsibilities |
 | :--- | :--- | :--- |
 | **Citizen (Resident)** | `/index.html` | Geotagged incident submission, status tracking, Bokaro heatmap, civic wallet, rewards store. |
-| **Field Worker (*Safai Karmachari*)** | `/worker-login.html`<br>`/worker-register.html` | Aadhaar KYC registration, task acceptance in assigned Bokaro sector, before/after cleanup photo verification. |
+| **Field Worker** | `/worker-login.html`<br>`/worker-register.html` | Aadhaar KYC registration, task acceptance in assigned Bokaro sector, before/after cleanup photo verification. |
 | **Zone Municipal Officer** | `/officer-login.html`<br>`/officer-dashboard.html` | Scoped ward dispatching, worker assignment, cleanup proof audit, ticket resolution. |
 | **Super Admin (*CMO*)** | `/super-admin-login.html`<br>`/super-admin-dashboard.html` | Executive municipal command center, officer provisioning, worker approval queue, citywide KPI analytics. |
 

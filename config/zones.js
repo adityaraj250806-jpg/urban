@@ -56,25 +56,21 @@ export const BOKARO_BOUNDS = {
   maxLng: 86.2200
 };
 
-// Backwards-compatible alias if referenced elsewhere
-export const GONDA_BOUNDS = BOKARO_BOUNDS;
+// BOKARO_BOUNDS is the canonical name for the geofence configuration
 
 // Auto-detect zone from GPS coordinates
 export function detectZoneFromCoordinates(lat, lng) {
-  if (!lat || !lng) return null;
+  if (!lat || !lng) return 'Zone 5 - Central Bokaro';
 
   const numLat = parseFloat(lat);
   const numLng = parseFloat(lng);
+  if (isNaN(numLat) || isNaN(numLng)) return 'Zone 5 - Central Bokaro';
 
-  // 1. Check Strict Bounds (Ignore in Dev Mode)
-  if (!DEV_MODE) {
-    if (numLat < BOKARO_BOUNDS.minLat || numLat > BOKARO_BOUNDS.maxLat ||
-        numLng < BOKARO_BOUNDS.minLng || numLng > BOKARO_BOUNDS.maxLng) {
-      console.log(`📍 Rejected: ${numLat}, ${numLng} is outside Bokaro Steel City jurisdiction.`);
-      return null; // OUTSIDE SERVICE AREA
-    }
-  } else {
-    console.log('🚧 DEV_MODE: Ignoring GPS bounds check.');
+  // If outside Bokaro bounds or from any other location, gracefully move it into Zone 5 - Central Bokaro (GreenCredits behavior)
+  if (numLat < BOKARO_BOUNDS.minLat || numLat > BOKARO_BOUNDS.maxLat ||
+      numLng < BOKARO_BOUNDS.minLng || numLng > BOKARO_BOUNDS.maxLng) {
+    console.log(`📍 Location (${numLat}, ${numLng}) is outside Bokaro jurisdiction -> Auto-assigned to Zone 5 - Central Bokaro.`);
+    return 'Zone 5 - Central Bokaro';
   }
 
   // 2. Assign Internal Bokaro Operational Zones
@@ -85,3 +81,4 @@ export function detectZoneFromCoordinates(lat, lng) {
 
   return 'Zone 5 - Central Bokaro';
 }
+

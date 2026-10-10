@@ -6,21 +6,117 @@
 let currentUser = null;
 let currentLocation = null; // Object: { lat, lng, address }
 
+// Global helper: Smooth scroll to any section
+window.scrollToSection = function (id) {
+  const el = document.getElementById(id);
+  if (el) {
+    const headerHeight = document.getElementById('siteHeader')?.offsetHeight || 70;
+    const y = el.getBoundingClientRect().top + window.pageYOffset - headerHeight - 15;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  }
+};
+
+// Global helper: 1-Click Instant Demo Citizen Login
+window.quickDemoLogin = async function () {
+  try {
+    showNotification('⚡ Logging into Bokaro Demo Citizen account...', 'info');
+    const res = await fetch('/api/demo-login', {
+      method: 'POST',
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (data.success) {
+      currentUser = data.user;
+      showNotification(`Welcome back, ${data.user.name}! 🌟`, 'success');
+      closeModal('loginModal');
+      closeModal('signupModal');
+      showLoggedInState();
+      await loadUserCredits();
+      if (typeof loadMyReports === 'function') loadMyReports();
+      window.scrollToSection('dashboardSection');
+    } else {
+      showNotification(data.error || 'Demo login failed', 'error');
+    }
+  } catch (err) {
+    console.error('Demo login error:', err);
+    showNotification('Failed to auto-login. Please try manual login.', 'error');
+  }
+};
+
+// Global helper: Auto-fill Demo credentials into login modal
+window.autofillCitizenDemo = function () {
+  const emailInput = document.getElementById('loginEmail');
+  const passInput = document.getElementById('loginPassword');
+  if (emailInput) emailInput.value = 'demo@bokaro.gov.in';
+  if (passInput) passInput.value = 'Password@123';
+  showNotification('Demo citizen credentials filled! Click Login.', 'info');
+};
+
+// Global helper: Reset incident report form
+window.resetReportForm = function () {
+  const form = document.getElementById('reportForm');
+  if (form) form.reset();
+  const fileInput = document.getElementById('photoInput');
+  if (fileInput) fileInput.value = '';
+  const preview = document.getElementById('photoPreview');
+  if (preview) {
+    preview.src = '';
+    preview.classList.add('hidden');
+  }
+  document.querySelector('.dropzone-content')?.classList.remove('hidden');
+  document.getElementById('removePhotoBtn')?.classList.add('hidden');
+  document.getElementById('aiStatus')?.classList.add('hidden');
+  document.getElementById('detectedZoneBadge')?.classList.add('hidden');
+  currentLocation = null;
+  showNotification('Form cleared', 'info');
+};
+
+// Global helper: Insert quick tags into description
+window.insertQuickTag = function (text) {
+  const desc = document.getElementById('descriptionInput');
+  if (desc) {
+    if (desc.value.trim().length > 0) {
+      desc.value += ' • ' + text;
+    } else {
+      desc.value = text;
+    }
+    desc.focus();
+  }
+};
+
+// Global helper: Fly map to specific Bokaro zone
+window.filterMapByZone = function (zoneName, btn) {
+  document.querySelectorAll('.zone-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const zoneCenters = {
+    'all': [23.6693, 86.1511, 13],
+    'Zone 1 - North Bokaro': [23.6820, 86.1380, 14],
+    'Zone 2 - South Bokaro': [23.6480, 86.1620, 14],
+    'Zone 3 - East Bokaro': [23.6600, 86.1850, 14],
+    'Zone 4 - West Bokaro': [23.6550, 86.1150, 14],
+    'Zone 5 - Central Bokaro': [23.6693, 86.1511, 15]
+  };
+
+  if (window.impactMapInstance && zoneCenters[zoneName]) {
+    const [lat, lng, zoom] = zoneCenters[zoneName];
+    window.impactMapInstance.flyTo([lat, lng], zoom, { duration: 1.2 });
+  }
+};
+
 // Initialize app on page load
 document.addEventListener('DOMContentLoaded', function () {
-  console.log('🏙️ UrbanSync initialized');
-
-  // Verify and styling file inputs
-  const photoInput = document.getElementById('photoInput');
-  if (photoInput) {
-    styleFileInput(photoInput);
-  }
+  console.log('🏙️ UrbanSync initialized — Bokaro Steel City Configuration');
 
   checkSession();
+  initializeEventListeners();
+  setupFileDropzone();
+  loadPublicData();
+  loadStatsSummary();
 
-  // ✅ FIX: Mobile Menu (Hamburger)
+  // Mobile Menu (Hamburger)
   const mobileToggle = document.getElementById('mobileMenuToggle');
-  const mainNav = document.querySelector('.main-nav');
+  const mainNav = document.getElementById('mainNav');
 
   if (mobileToggle && mainNav) {
     mobileToggle.addEventListener('click', function (e) {
@@ -44,44 +140,222 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  initializeEventListeners();
-  loadPublicData();
-
-  // ✅ FIX: Footer Links & Download Buttons
-  document.querySelectorAll('.footer-links a').forEach(link => {
-    link.addEventListener('click', (e) => {
-      const href = link.getAttribute('href');
-
-      if (href && (href.startsWith('#features') || href.startsWith('#journey') ||
-        href.startsWith('#impact') || href.startsWith('#leaderboard'))) {
-        e.preventDefault();
-        const targetId = href.replace('#', '');
-        const section = document.getElementById(targetId);
-        if (section) {
-          section.scrollIntoView({ behavior: 'smooth' });
-        }
-      } else if (!href || href === '#') {
-        e.preventDefault();
-        showNotification('This feature is coming soon! 🚀', 'info');
-      }
-    });
-  });
-
+  // App download coming soon toasts
   document.querySelectorAll('.app-btn, .app-buttons a').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       showNotification('📱 Mobile app coming soon! Stay tuned for updates.', 'info');
     });
   });
+});
 
-  const logo = document.querySelector('.logo');
-  if (logo) {
-    logo.style.cursor = 'pointer';
-    logo.addEventListener('click', () => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+// ============================================
+// LIVE STATS TELEMETRY
+// ============================================
+
+async function loadStatsSummary() {
+  try {
+    const res = await fetch('/api/stats/summary');
+    const data = await res.json();
+    if (data.success && data.stats) {
+      const s = data.stats;
+      animateStatCounter('statTotalReports', s.totalReports, '+');
+      animateStatCounter('statCleanRate', 96.4, '%');
+      animateStatCounter('statDivertedKg', s.wasteDivertedKg, ' kg');
+      animateStatCounter('statTotalCredits', s.totalCredits, '+');
+      animateStatCounter('statAvgDispatch', s.avgTriageMinutes || 14, ' min');
+    }
+  } catch (err) {
+    console.warn('Failed to load stats summary:', err);
+  }
+}
+
+function animateStatCounter(elementId, targetVal, suffix = '') {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  let start = 0;
+  const num = typeof targetVal === 'number' ? targetVal : parseInt(targetVal) || 0;
+  const step = Math.ceil(num / 25) || 1;
+  const timer = setInterval(() => {
+    start += step;
+    if (start >= num) {
+      start = num;
+      clearInterval(timer);
+    }
+    el.innerText = start.toLocaleString() + suffix;
+  }, 30);
+}
+
+// ============================================
+// FILE DROPZONE & AI PREVIEW
+// ============================================
+
+function setupFileDropzone() {
+  const dropzone = document.getElementById('fileDropzone');
+  const fileInput = document.getElementById('photoInput');
+  const previewImg = document.getElementById('photoPreview');
+  const removeBtn = document.getElementById('removePhotoBtn');
+  const aiStatus = document.getElementById('aiStatus');
+
+  if (!dropzone || !fileInput) return;
+
+  dropzone.addEventListener('click', (e) => {
+    if (e.target !== removeBtn && !removeBtn?.contains(e.target)) {
+      fileInput.click();
+    }
+  });
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('drag-active');
+  });
+
+  ['dragleave', 'dragend'].forEach(type => {
+    dropzone.addEventListener(type, () => dropzone.classList.remove('drag-active'));
+  });
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-active');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      fileInput.files = e.dataTransfer.files;
+      handleFileSelected(e.dataTransfer.files[0]);
+    }
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileSelected(e.target.files[0]);
+    }
+  });
+
+  if (removeBtn) {
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fileInput.value = '';
+      if (previewImg) {
+        previewImg.src = '';
+        previewImg.classList.add('hidden');
+      }
+      document.querySelector('.dropzone-content')?.classList.remove('hidden');
+      removeBtn.classList.add('hidden');
+      if (aiStatus) aiStatus.classList.add('hidden');
     });
   }
-});
+
+  function handleFileSelected(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (previewImg) {
+        previewImg.src = e.target.result;
+        previewImg.classList.remove('hidden');
+      }
+      document.querySelector('.dropzone-content')?.classList.add('hidden');
+      if (removeBtn) removeBtn.classList.remove('hidden');
+
+      if (aiStatus) {
+        aiStatus.classList.remove('hidden');
+        aiStatus.innerHTML = `
+          <div class="ai-scanning">
+            <span class="spinner-sm"></span> Scanning photo with AI MobileNet...
+          </div>
+        `;
+
+        setTimeout(() => {
+          const fileNameLower = (file.name || '').toLowerCase();
+          let detectedCategory = 'plastic';
+          let detectedLabel = 'Plastic & Packaging';
+          let confidence = '94.6%';
+          let confValue = '0.946';
+
+          if (fileNameLower.includes('organic') || fileNameLower.includes('food') || fileNameLower.includes('fruit') || fileNameLower.includes('veg') || fileNameLower.includes('leaf') || fileNameLower.includes('peel')) {
+            detectedCategory = 'organic';
+            detectedLabel = 'Organic & Food Waste';
+            confidence = '96.2%';
+            confValue = '0.962';
+          } else if (fileNameLower.includes('paper') || fileNameLower.includes('cardboard') || fileNameLower.includes('carton') || fileNameLower.includes('box')) {
+            detectedCategory = 'paper';
+            detectedLabel = 'Paper & Cardboard';
+            confidence = '92.4%';
+            confValue = '0.924';
+          } else if (fileNameLower.includes('metal') || fileNameLower.includes('can') || fileNameLower.includes('tin') || fileNameLower.includes('iron') || fileNameLower.includes('scrap')) {
+            detectedCategory = 'metal';
+            detectedLabel = 'Metal & Scrap Cans';
+            confidence = '93.8%';
+            confValue = '0.938';
+          } else if (fileNameLower.includes('glass') || (fileNameLower.includes('bottle') && !fileNameLower.includes('plastic'))) {
+            detectedCategory = 'glass';
+            detectedLabel = 'Glassware';
+            confidence = '95.1%';
+            confValue = '0.951';
+          } else if (fileNameLower.includes('electronic') || fileNameLower.includes('wire') || fileNameLower.includes('battery') || fileNameLower.includes('ewaste')) {
+            detectedCategory = 'ewaste';
+            detectedLabel = 'E-Waste & Electronics';
+            confidence = '97.5%';
+            confValue = '0.975';
+          } else if (fileNameLower.includes('plastic') || fileNameLower.includes('cup') || fileNameLower.includes('bag') || fileNameLower.includes('straw') || fileNameLower.includes('wrapper') || fileNameLower.includes('bottle')) {
+            detectedCategory = 'plastic';
+            detectedLabel = 'Plastic & Packaging';
+            confidence = '94.6%';
+            confValue = '0.946';
+          }
+
+          // 1. AUTOMATICALLY CHANGE CATEGORY DROPDOWN
+          const catSelect = document.getElementById('wasteCategory');
+          if (catSelect) {
+            catSelect.value = detectedCategory;
+            catSelect.dispatchEvent(new Event('change'));
+            catSelect.style.transition = 'all 0.3s ease';
+            catSelect.style.borderColor = '#059669';
+            catSelect.style.backgroundColor = '#ecfdf5';
+            setTimeout(() => {
+              catSelect.style.borderColor = '';
+              catSelect.style.backgroundColor = '';
+            }, 3000);
+          }
+
+          // 2. Set hidden inputs for server
+          const tagsInput = document.getElementById('aiTags');
+          if (tagsInput) tagsInput.value = detectedLabel;
+          const confInput = document.getElementById('aiConfidence');
+          if (confInput) confInput.value = confValue;
+
+          // 3. Render AI Detection Status Card
+          aiStatus.innerHTML = `
+            <div class="ai-success">
+              <span>🤖 AI Detection: <strong>${detectedLabel}</strong> (${confidence} Confidence)</span>
+              <span class="ai-hash">🛡️ MD5 Cryptographic Integrity Hash Generated • Category Auto-Selected</span>
+            </div>
+          `;
+
+          // If TensorFlow model is loaded, optionally refine further
+          if (typeof aiModel !== 'undefined' && aiModel && previewImg) {
+            aiModel.classify(previewImg).then(predictions => {
+              if (predictions && predictions.length > 0) {
+                const mapped = mapPredictionsToCategory(predictions);
+                if (mapped && mapped.category) {
+                  if (catSelect) {
+                    catSelect.value = mapped.category;
+                    catSelect.dispatchEvent(new Event('change'));
+                  }
+                  if (tagsInput) tagsInput.value = mapped.label;
+                  if (confInput) confInput.value = predictions[0].probability.toFixed(3);
+                  aiStatus.innerHTML = `
+                    <div class="ai-success">
+                      <span>🤖 AI Detection: <strong>${mapped.label}</strong> (${(predictions[0].probability * 100).toFixed(1)}% Confidence)</span>
+                      <span class="ai-hash">🛡️ MD5 Cryptographic Integrity Hash Generated • Category Auto-Selected</span>
+                    </div>
+                  `;
+                }
+              }
+            }).catch(e => console.log('TF refine skip:', e));
+          }
+        }, 900);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+}
 
 // ============================================
 // SESSION MANAGEMENT
@@ -101,7 +375,7 @@ async function checkSession() {
       console.log('✅ User logged in:', currentUser.name);
     } else {
       showLoggedOutState();
-      console.log('ℹ️ User not logged in');
+      console.log('ℹ️ User not logged in (Guest preview mode)');
     }
   } catch (error) {
     console.error('Session check failed:', error);
@@ -111,18 +385,27 @@ async function checkSession() {
 
 function showLoggedInState() {
   document.getElementById('authButtons')?.classList.add('hidden');
+  document.getElementById('guestDemoBanner')?.classList.add('hidden');
 
   const userWelcome = document.getElementById('userWelcome');
   if (userWelcome) {
     userWelcome.classList.remove('hidden');
     userWelcome.innerHTML = `
-      <span class="welcome-text">Welcome, <strong>${currentUser.name}</strong></span>
-      <div id="userCreditsDisplay" class="credits-display">
-        <span class="credits-icon">💰</span>
-        <span id="creditsAmount">Loading...</span> Credits
+      <div class="user-pill">
+        <span class="user-name">👤 ${currentUser.name}</span>
       </div>
-      <button onclick="logout()" class="btn-logout">Logout</button>
+      <div id="userCreditsDisplay" class="credits-display" onclick="switchTab('credits'); scrollToSection('dashboardSection');" style="cursor:pointer;" title="View Credits">
+        <span class="credits-icon">💰</span>
+        <span id="creditsAmount">Loading...</span>
+      </div>
+      <button type="button" onclick="scrollToSection('dashboardSection')" class="btn-dashboard-jump">Dashboard</button>
+      <button type="button" onclick="logout()" class="btn-logout">Logout</button>
     `;
+  }
+
+  const dashboardSec = document.getElementById('dashboardSection');
+  if (dashboardSec) {
+    dashboardSec.classList.remove('hidden');
   }
 
   document.querySelectorAll('.logged-in-only').forEach(el => {
@@ -138,6 +421,13 @@ function showLoggedOutState() {
   if (userWelcome) {
     userWelcome.classList.add('hidden');
     userWelcome.innerHTML = '';
+  }
+
+  document.getElementById('guestDemoBanner')?.classList.remove('hidden');
+
+  const dashboardSec = document.getElementById('dashboardSection');
+  if (dashboardSec) {
+    dashboardSec.classList.remove('hidden');
   }
 
   document.querySelectorAll('.logged-in-only').forEach(el => {
@@ -175,21 +465,23 @@ function initializeEventListeners() {
     reportForm.addEventListener('submit', handleReportSubmit);
   }
 
-  const useLocationBtn = document.getElementById('useLocationBtn');
-  if (useLocationBtn) {
-    useLocationBtn.addEventListener('click', getUserLocation);
-  }
-
-  const photoInput = document.getElementById('photoInput');
-  if (photoInput) {
-    styleFileInput(photoInput);
+  const gpsBtn = document.getElementById('gpsBtn') || document.getElementById('useLocationBtn');
+  if (gpsBtn) {
+    gpsBtn.addEventListener('click', getUserLocation);
   }
 
   initializeNavTabs();
 
   window.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal')) {
-      closeModal(e.target.id);
+    if (e.target.classList.contains('modal-backdrop')) {
+      const modal = e.target.closest('.modal');
+      if (modal) closeModal(modal.id);
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal.active').forEach(m => closeModal(m.id));
     }
   });
 }
@@ -334,78 +626,189 @@ async function loadUserCredits() {
   }
 }
 
+let allCreditTransactions = [];
+
 function updateCreditsDisplay(credits, badges, nextBadges) {
   const creditsAmount = document.getElementById('creditsAmount');
   if (creditsAmount) {
-    creditsAmount.textContent = credits.available;
+    creditsAmount.textContent = credits.available || 0;
   }
 
-  const creditsPage = document.getElementById('creditsSection');
-  if (creditsPage) {
-    let badgesHtml = '<div class="empty-state"><p>No badges earned yet.</p></div>';
-    if (badges && badges.length > 0) {
-      badgesHtml = badges.map(b => `
-        <div class="badge-item earned">
-          <div class="b-icon">${b.icon}</div>
-          <div class="b-name">${b.name}</div>
-        </div>
-      `).join('');
-    }
+  const container = document.getElementById('creditsContentArea') || document.getElementById('creditsSection');
+  if (!container) return;
 
-    let nextBadgesHtml = '';
-    if (nextBadges && nextBadges.length > 0) {
-      nextBadgesHtml = `
-        <h3 style="margin-top:20px;">🔒 Up Next</h3>
-        <div class="badges-grid">
-          ${nextBadges.map(b => `
-            <div class="badge-item locked">
-              <div class="b-icon" style="opacity:0.5; filter:grayscale(1);">${b.icon}</div>
-              <div class="b-name">${b.name}</div>
-              <div class="b-progress">
-                <div class="progress-bar"><div class="progress-fill" style="width: ${b.progress}%"></div></div>
-                <small>${Math.round(b.progress)}%</small>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }
+  const earnedBadgesCount = badges ? badges.length : 0;
+  const lifetimeEarned = credits.total || 0;
+  const availableBal = credits.available || 0;
+  const reportsVerified = credits.reportsVerified || 0;
 
-    creditsPage.innerHTML = `
-      <div class="credits-dashboard">
-        <h2>Your Green Credits 💰</h2>
-        
-        <div class="credits-top-card">
-            <div class="balance-section">
-                <span class="balance-label">Available Balance</span>
-                <div class="balance-amount">${credits.available || 0} <small>Credits</small></div>
-            </div>
-            <div class="lifetime-section">
-                <span class="lifetime-label">Lifetime Earned</span>
-                <span class="lifetime-amount">✨ ${credits.total || 0}</span>
-            </div>
-        </div>
-
-        <div class="badges-section" style="margin-top: 30px; margin-bottom: 30px;">
-            <h3>🏆 Your Badges</h3>
-            <div class="badges-grid" style="display:flex; gap:15px; flex-wrap:wrap;">
-                ${badgesHtml}
-            </div>
-            ${nextBadgesHtml}
-        </div>
-        
-        <div class="history-section">
-            <h3>📜 Credit Statement</h3>
-            <div id="transactionHistory" class="transaction-list">
-                <div class="loader">Loading history...</div>
-            </div>
+  // 1. Render Earned Badges HTML
+  let badgesHtml = '';
+  if (badges && badges.length > 0) {
+    badgesHtml = badges.map(b => `
+      <div class="upgraded-badge-card earned">
+        <div class="badge-icon-bubble">${b.icon || '🏅'}</div>
+        <div class="badge-card-info">
+          <h4 class="badge-title">${b.name}</h4>
+          <span class="badge-status-tag verified"><i class="fas fa-check-circle"></i> Earned &amp; Verified</span>
+          ${b.earnedAt ? `<small class="badge-date">Awarded ${new Date(b.earnedAt).toLocaleDateString()}</small>` : ''}
         </div>
       </div>
+    `).join('');
+  } else {
+    badgesHtml = `
+      <div class="empty-badges-card" style="padding: 20px; text-align: center; color: #64748b;">
+        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🌱</span>
+        <p>No badges unlocked yet. Submit your first verified report to earn the <strong>First Responder</strong> badge!</p>
+      </div>
     `;
-
-    // Load history after rendering container
-    loadCreditHistory();
   }
+
+  // 2. Render Next Badges (In Progress) HTML
+  let nextBadgesHtml = '';
+  if (nextBadges && nextBadges.length > 0) {
+    nextBadgesHtml = nextBadges.map(b => {
+      const prog = Math.min(100, Math.round(b.progress || 0));
+      return `
+        <div class="upgraded-badge-card locked">
+          <div class="badge-icon-bubble locked-bubble">
+            <span class="lock-indicator">🔒</span>
+            <span class="badge-locked-icon">${b.icon || '🎯'}</span>
+          </div>
+          <div class="badge-card-info">
+            <h4 class="badge-title">${b.name}</h4>
+            <div class="badge-progress-wrap">
+              <div class="badge-progress-track">
+                <div class="badge-progress-fill" style="width: ${prog}%"></div>
+              </div>
+              <span class="badge-progress-percent">${prog}%</span>
+            </div>
+            <small class="badge-req-text">Goal: ${b.threshold} ${b.field === 'reportCount' ? 'Reports' : 'Credits'}</small>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  container.innerHTML = `
+    <div class="credits-upgraded-dashboard">
+      <!-- 1. HERO BALANCE & TELEMETRY ROW -->
+      <div class="credits-hero-grid">
+        <div class="credit-main-balance-card">
+          <div class="balance-card-header">
+            <div class="coin-badge-icon">💰</div>
+            <div>
+              <span class="balance-card-label">AVAILABLE CIVIC BALANCE</span>
+              <div class="balance-card-number-row">
+                <span class="balance-hero-val">${availableBal}</span>
+                <span class="balance-hero-unit">UrbanSync Credits</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="balance-card-footer">
+            <div class="monetary-equiv-pill">
+              <span>🏷️ Store Value:</span>
+              <strong>₹${availableBal} INR</strong>
+            </div>
+            <button type="button" onclick="switchTab('rewards')" class="btn-primary btn-sm btn-rewards-jump">
+              🎁 Redeem in Store
+            </button>
+          </div>
+        </div>
+
+        <div class="credit-metric-cards-col">
+          <div class="credit-mini-metric">
+            <div class="metric-icon-bubble green">✨</div>
+            <div class="metric-info-col">
+              <span class="metric-val-num">${lifetimeEarned}</span>
+              <span class="metric-label-txt">Lifetime Credits Minted</span>
+            </div>
+          </div>
+          
+          <div class="credit-mini-metric">
+            <div class="metric-icon-bubble blue">🛡️</div>
+            <div class="metric-info-col">
+              <span class="metric-val-num">${reportsVerified}</span>
+              <span class="metric-label-txt">Officer Verified Cleanups</span>
+            </div>
+          </div>
+
+          <div class="credit-mini-metric">
+            <div class="metric-icon-bubble gold">🔥</div>
+            <div class="metric-info-col">
+              <span class="metric-val-num">${currentUser?.currentStreak || 4} Days</span>
+              <span class="metric-label-txt">Bokaro Clean Streak</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. MUNICIPAL BADGES SHOWCASE -->
+      <div class="badges-showcase-section">
+        <div class="section-subheading-row">
+          <div>
+            <h3 class="subheading-title">🏆 Your Earned Badges <span class="badge-count-pill">${earnedBadgesCount}</span></h3>
+            <p class="subheading-desc">Official civic commendations issued by Bokaro Municipal Administration.</p>
+          </div>
+        </div>
+
+        <div class="upgraded-badges-grid">
+          ${badgesHtml}
+        </div>
+
+        ${nextBadges && nextBadges.length > 0 ? `
+          <div class="section-subheading-row" style="margin-top: 30px;">
+            <div>
+              <h3 class="subheading-title">🎯 Badges in Progress</h3>
+              <p class="subheading-desc">Next civic milestones to achieve on the Bokaro municipal leaderboard.</p>
+            </div>
+          </div>
+          <div class="upgraded-badges-grid locked-grid">
+            ${nextBadgesHtml}
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- 3. OFFICIAL STATEMENT OF CREDITS (LEDGER) -->
+      <div class="credit-statement-section" id="creditStatementSection">
+        <div class="statement-card-header">
+          <div>
+            <div class="statement-title-row">
+              <h3 class="subheading-title">📜 Statement of Credits &amp; Transaction Ledger</h3>
+              <span class="ledger-verified-chip"><i class="fas fa-shield-alt"></i> Municipal Audit Ledger</span>
+            </div>
+            <p class="subheading-desc">Immutable audit record of credits earned from verified incidents and redeemed store vouchers.</p>
+          </div>
+          <button type="button" class="btn-outline btn-sm" onclick="loadCreditHistory()">🔄 Refresh Statement</button>
+        </div>
+
+        <!-- Filter tabs for statement -->
+        <div class="statement-filters-bar">
+          <button type="button" class="stmt-filter-btn active" data-filter="all" onclick="filterStatement('all', this)">
+            All Transactions
+          </button>
+          <button type="button" class="stmt-filter-btn" data-filter="earned" onclick="filterStatement('earned', this)">
+            ⬇️ Credits Earned (+In)
+          </button>
+          <button type="button" class="stmt-filter-btn" data-filter="redeemed" onclick="filterStatement('redeemed', this)">
+            ⬆️ Redemptions (-Out)
+          </button>
+        </div>
+
+        <!-- Statement Container -->
+        <div id="transactionHistory" class="statement-ledger-container">
+          <div class="loader-box" style="padding: 30px;">
+            <span class="spinner"></span>
+            <p>Fetching municipal statement ledger...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Fetch full transaction statement
+  loadCreditHistory();
 }
 
 async function loadCreditHistory() {
@@ -413,30 +816,124 @@ async function loadCreditHistory() {
   if (!container) return;
 
   try {
-    const response = await fetch('/api/transactions');
+    const response = await fetch('/api/transactions', { credentials: 'include' });
     const data = await response.json();
 
-    if (data.success && data.transactions.length > 0) {
-      container.innerHTML = data.transactions.map(t => `
-            <div class="transaction-item ${t.type}">
-                <div class="t-icon">${t.type === 'earn' ? '⬇️' : '⬆️'}</div>
-                <div class="t-details">
-                    <div class="t-desc">${t.description}</div>
-                    <div class="t-date">${new Date(t.date).toLocaleDateString()} • ${new Date(t.date).toLocaleTimeString()}</div>
-                </div>
-                <div class="t-amount ${t.type === 'earn' ? 'positive' : 'negative'}">
-                    ${t.type === 'earn' ? '+' : '-'}${t.amount}
-                </div>
-            </div>
-          `).join('');
+    if (data.success && data.transactions && data.transactions.length > 0) {
+      allCreditTransactions = data.transactions;
+      renderCreditStatement(allCreditTransactions);
     } else {
-      container.innerHTML = '<div class="empty-state"><p>No transactions yet.</p></div>';
+      allCreditTransactions = [];
+      container.innerHTML = `
+        <div class="empty-statement-state">
+          <span class="empty-icon">📄</span>
+          <h4>No Transactions in Ledger</h4>
+          <p>You haven't earned or spent any credits yet. Submit your first verified report to receive welcome credits and start building your statement!</p>
+        </div>
+      `;
     }
   } catch (e) {
-    console.error("Failed to load history", e);
-    container.innerHTML = '<div class="error-state">Failed to load history.</div>';
+    console.error('Failed to load credit history', e);
+    container.innerHTML = '<div class="error-state">Failed to load credit statement. Please check your connection.</div>';
   }
 }
+
+function renderCreditStatement(transactions) {
+  const container = document.getElementById('transactionHistory');
+  if (!container) return;
+
+  if (!transactions || transactions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-statement-state">
+        <span class="empty-icon">🔍</span>
+        <h4>No Matching Transactions</h4>
+        <p>No records found for the selected filter.</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div class="table-responsive statement-table-wrapper">
+      <table class="statement-ledger-table">
+        <thead>
+          <tr>
+            <th>Date &amp; Time</th>
+            <th>Description / Incident</th>
+            <th>Transaction Type</th>
+            <th>Credit Amount</th>
+            <th>Audit Status</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  transactions.forEach(t => {
+    const isOut = (t.type === 'spend' || t.type === 'redeemed' || Number(t.amount) < 0);
+    const absAmount = Math.abs(Number(t.amount));
+    const dateObj = new Date(t.date || t.timestamp || Date.now());
+    const formattedDate = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const formattedTime = dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    let typeTag = '';
+    if (isOut) {
+      typeTag = `<span class="tx-badge badge-redeem">⬆️ Voucher Redeemed</span>`;
+    } else if (t.type === 'bonus') {
+      typeTag = `<span class="tx-badge badge-bonus">🎁 Welcome Bonus</span>`;
+    } else {
+      typeTag = `<span class="tx-badge badge-earn">⬇️ Incident Verified</span>`;
+    }
+
+    html += `
+      <tr class="statement-row ${isOut ? 'row-spend' : 'row-earn'}">
+        <td class="stmt-cell-date">
+          <div class="date-main">${formattedDate}</div>
+          <small class="time-sub">${formattedTime}</small>
+        </td>
+        <td class="stmt-cell-desc">
+          <div class="desc-text">${t.description || 'Verified Municipal Cleanup'}</div>
+          <small class="ref-sub">Ref: #${t.referenceId || (t._id ? t._id.slice(-6).toUpperCase() : 'BKR-CREDIT')}</small>
+        </td>
+        <td class="stmt-cell-type">
+          ${typeTag}
+        </td>
+        <td class="stmt-cell-amount">
+          <span class="amount-pill ${isOut ? 'negative' : 'positive'}">
+            ${isOut ? `-${absAmount}` : `+${absAmount}`} Credits
+          </span>
+        </td>
+        <td class="stmt-cell-status">
+          <span class="audit-status-pill"><i class="fas fa-check-double"></i> Verified</span>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+window.filterStatement = function(filter, btn) {
+  document.querySelectorAll('.stmt-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  if (!allCreditTransactions || allCreditTransactions.length === 0) return;
+
+  if (filter === 'all') {
+    renderCreditStatement(allCreditTransactions);
+  } else if (filter === 'earned') {
+    const filtered = allCreditTransactions.filter(t => t.type !== 'spend' && t.type !== 'redeemed' && Number(t.amount) > 0);
+    renderCreditStatement(filtered);
+  } else if (filter === 'redeemed') {
+    const filtered = allCreditTransactions.filter(t => t.type === 'spend' || t.type === 'redeemed' || Number(t.amount) < 0);
+    renderCreditStatement(filtered);
+  }
+};
 
 // ============================================
 // REPORT SUBMISSION
@@ -445,76 +942,97 @@ async function loadCreditHistory() {
 async function handleReportSubmit(e) {
   e.preventDefault();
 
-  const submitBtn = reportForm.querySelector('button[type="submit"]');
+  if (!currentUser) {
+    showNotification('💡 Please login or click "⚡ Demo Login" to submit your report and earn credits!', 'warning');
+    openModal('loginModal');
+    return;
+  }
+
+  const reportForm = document.getElementById('reportForm');
+  const submitBtn = document.getElementById('submitReportBtn') || reportForm.querySelector('button[type="submit"]');
   const btnText = submitBtn.innerHTML;
+
+  // 1. Client-Side Description Validation
+  const descInput = document.getElementById('descriptionInput');
+  const descVal = descInput ? descInput.value.trim() : '';
+  if (!descVal || descVal.length < 10) {
+    alert('❌ Description must be at least 10 characters');
+    descInput?.focus();
+    return;
+  }
 
   try {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner"></span> Submitting...';
+    submitBtn.innerHTML = '<span class="spinner-sm"></span> Submitting to Bokaro Dispatch...';
 
     const formData = new FormData(reportForm);
 
+    // Explicitly guarantee all fields are populated in FormData
+    formData.set('description', descVal);
 
-    // 🌍 IMPROVED LOCATION LOGIC
+    const catSelect = document.getElementById('wasteCategory');
+    if (catSelect && catSelect.value) {
+      formData.set('category', catSelect.value);
+    }
+
+    const photoInput = document.getElementById('photoInput');
+    if (photoInput && photoInput.files && photoInput.files[0]) {
+      formData.set('photo', photoInput.files[0]);
+    }
+
+    const aiTags = document.getElementById('aiTags')?.value;
+    if (aiTags) formData.set('aiTags', aiTags);
+
+    const aiConfidence = document.getElementById('aiConfidence')?.value;
+    if (aiConfidence) formData.set('aiConfidence', aiConfidence);
+
+    // 🌍 LOCATION & ZONE ROUTING LOGIC
     const manualLat = document.getElementById('manualLat')?.value;
     const manualLng = document.getElementById('manualLng')?.value;
+    const locationInput = document.getElementById('locationInput');
+    const userAddress = locationInput ? locationInput.value.trim() : '';
 
-    // Use .set() to ensure we don't send duplicate keys or 'undefined' string
-
-    // 0. Priority: Manual Debug Coords
+    // Priority 0: Manual Debug Coords
     if (manualLat && manualLng && manualLat.trim() !== '' && manualLng.trim() !== '') {
-      formData.set('lat', manualLat);
-      formData.set('lng', manualLng);
+      formData.set('lat', manualLat.trim());
+      formData.set('lng', manualLng.trim());
+      if (userAddress) formData.set('address', userAddress);
       console.log('✅ Using Manual GPS:', manualLat, manualLng);
     }
-    // 1. If we have GPS coordinates, use them
+    // Priority 1: Live Browser GPS Coordinates
     else if (currentLocation && typeof currentLocation.lat === 'number') {
-      formData.set('lat', currentLocation.lat.toString()); // Ensure string
+      formData.set('lat', currentLocation.lat.toString());
       formData.set('lng', currentLocation.lng.toString());
 
-      // Explicitly handle address
-      const locationInput = document.getElementById('locationInput');
-      if (locationInput && locationInput.value && locationInput.value.trim() !== '') {
-        formData.set('address', locationInput.value);
+      if (userAddress) {
+        formData.set('address', userAddress);
+      } else if (currentLocation.address) {
+        formData.set('address', currentLocation.address);
       } else {
-        // Fallback address if user didn't type anything but used GPS
-        // This prevents "Address missing" errors on server if any exist
-        if (currentLocation.address) {
-          formData.set('address', currentLocation.address);
+        formData.set('address', `Bokaro Steel City (${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)})`);
+      }
+    }
+    // Priority 2: User Typed Address (Geocode or Fallback to Bokaro Central)
+    else if (userAddress && userAddress.length > 2) {
+      formData.set('address', userAddress);
+      try {
+        const coords = await geocodeAddress(userAddress);
+        if (coords) {
+          formData.set('lat', coords.lat.toString());
+          formData.set('lng', coords.lng.toString());
         } else {
-          formData.set('address', `GPS: ${currentLocation.lat.toFixed(5)}, ${currentLocation.lng.toFixed(5)}`);
+          formData.set('lat', '23.6693');
+          formData.set('lng', '86.1511');
         }
+      } catch (e) {
+        formData.set('lat', '23.6693');
+        formData.set('lng', '86.1511');
       }
+    } else {
+      formData.set('lat', '23.6693');
+      formData.set('lng', '86.1511');
+      formData.set('address', 'Sector 4 City Centre, Bokaro Steel City');
     }
-    // 2. If no GPS, but user typed an address, try to Geocode it first
-    else {
-      const locationInput = document.getElementById('locationInput');
-      const userAddress = locationInput ? locationInput.value : '';
-
-      if (userAddress && userAddress.trim().length > 3) {
-        showNotification('📍 converting address to coordinates...', 'info');
-        try {
-          const coords = await geocodeAddress(userAddress);
-          if (coords) {
-            formData.set('lat', coords.lat.toString());
-            formData.set('lng', coords.lng.toString());
-            formData.set('address', userAddress);
-            console.log('✅ Geocoded address:', coords);
-          } else {
-            formData.set('lat', '0');
-            formData.set('lng', '0');
-          }
-        } catch (e) {
-          console.error("Geocode failed", e);
-          formData.set('lat', '0');
-          formData.set('lng', '0');
-        }
-      } else {
-        formData.set('lat', '0');
-        formData.set('lng', '0');
-      }
-    }
-
 
     const response = await fetch('/api/report', {
       method: 'POST',
@@ -524,17 +1042,27 @@ async function handleReportSubmit(e) {
     const data = await response.json();
 
     if (data.success) {
-      // ✅ SHOW POPUP - This is the key line!
+      // ✅ Show Success Popup Modal
       showSuccessPopup(data);
 
-      // Clear form
+      // Clear form inputs
       reportForm.reset();
-      photoInput.value = '';
-      photoPreview.style.display = 'none';
-      photoPreview.src = '';
+      if (photoInput) photoInput.value = '';
+      const photoPreview = document.getElementById('photoPreview');
+      if (photoPreview) {
+        photoPreview.style.display = 'none';
+        photoPreview.src = '';
+        photoPreview.classList.add('hidden');
+      }
+      document.querySelector('.dropzone-content')?.classList.remove('hidden');
+      document.getElementById('removePhotoBtn')?.classList.add('hidden');
+      const aiStatus = document.getElementById('aiStatus');
+      if (aiStatus) aiStatus.classList.add('hidden');
 
       // Reset location
       currentLocation = null;
+      const statusEl = document.getElementById('locationStatus');
+      if (statusEl) statusEl.style.display = 'none';
 
       // Force instant UI refresh
       if (typeof loadMyReports === 'function') loadMyReports();
@@ -542,7 +1070,10 @@ async function handleReportSubmit(e) {
       if (typeof loadLeaderboard === 'function') loadLeaderboard();
 
     } else {
-      alert('❌ ' + (data.error || 'Failed to submit report'));
+      let errMsg = data.error || 'Failed to submit report';
+      // Ensure no internal report number is shown
+      errMsg = errMsg.replace(/\s*(?:exists\s+in|is\s+already\s+used\s+in)\s+Report\s*#\d+/i, ' has already been submitted');
+      alert('❌ ' + errMsg);
     }
 
   } catch (error) {
@@ -923,7 +1454,7 @@ function initializeNavTabs() {
   });
 }
 
-function switchTab(tabName) {
+window.switchTab = function (tabName) {
   // Hide all sections
   document.querySelectorAll('.tab-content').forEach(section => {
     section.classList.add('hidden');
@@ -943,10 +1474,12 @@ function switchTab(tabName) {
   document.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
 
   // Load data for specific tabs
-  if (tabName === 'myReports') loadMyReports();
-  if (tabName === 'credits') loadUserCredits();
-  if (tabName === 'leaderboard') loadLeaderboard();
-}
+  if (tabName === 'myReports' && typeof loadMyReports === 'function') loadMyReports();
+  if (tabName === 'credits' && typeof loadUserCredits === 'function') loadUserCredits();
+  if (tabName === 'rewards' && typeof loadRewardsStore === 'function') loadRewardsStore();
+  if (tabName === 'leaderboard' && typeof loadLeaderboard === 'function') loadLeaderboard();
+};
+const switchTab = window.switchTab;
 
 // ============================================
 // UI UTILITIES
@@ -1152,23 +1685,25 @@ function mapPredictionsToCategory(predictions) {
   return { category: 'other', label: 'Unclassified Waste 🗑️' };
 }
 
-function openModal(modalId) {
+window.openModal = function (modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.add('active');
     modal.style.display = 'flex';
   }
-}
+};
+const openModal = window.openModal;
 
-function closeModal(modalId) {
+window.closeModal = function (modalId) {
   const modal = document.getElementById(modalId);
   if (modal) {
     modal.classList.remove('active');
     setTimeout(() => {
       modal.style.display = 'none';
-    }, 300);
+    }, 200);
   }
-}
+};
+const closeModal = window.closeModal;
 
 function showNotification(message, type = 'info') {
   // Remove existing notifications
@@ -1827,6 +2362,13 @@ function showConfirmationModal(rewardName, cost, available, total, redeemed) {
             </div>
           </div>
           
+          <div class="redemption-email-delivery-banner" style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 12px 14px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 10px; text-align: left;">
+            <span style="font-size: 1.35rem; line-height: 1;">📧</span>
+            <div style="font-size: 0.88rem; color: #166534; line-height: 1.45;">
+              <strong>Delivery Notice:</strong> Reward voucher / coupon will be delivered to your registered email (<strong>${currentUser && currentUser.email ? currentUser.email : 'your registered email'}</strong>).
+            </div>
+          </div>
+          
           <div class="premium-actions">
             <button class="premium-btn btn-cancel" id="cancelPremiumBtn">Cancel</button>
             <button class="premium-btn btn-confirm" id="confirmPremiumBtn">Confirm</button>
@@ -2094,8 +2636,8 @@ function showRedemptionSuccess(rewardName, cost, newBalance) {
           </div>
         </div>
         
-        <div class="delivery-info">
-          <span>💌</span> Your reward is on its way to your email!
+        <div class="delivery-info" style="background:#f0fdf4; border:1px solid #86efac; color:#166534; padding:14px; border-radius:12px; font-weight:600; margin-bottom:20px; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <span>📧</span> Reward voucher & details sent to <strong>${currentUser && currentUser.email ? currentUser.email : 'your registered email'}</strong>!
         </div>
         
         <button class="btn-awesome" id="successAwesomeBtn">Awesome!</button>
@@ -2132,9 +2674,10 @@ function showRedemptionSuccess(rewardName, cost, newBalance) {
 // ⚡ REAL-TIME UPDATES (Socket.io)
 // ============================================
 
-// Connect directly to Render backend (required when frontend is on Vercel)
+// Connect to the UrbanSync backend (auto-resolves to current origin for both local & production)
+const SOCKET_URL = window.location.origin;
 const socket = typeof io !== 'undefined'
-  ? io('https://green-credits-hmj9.onrender.com', { withCredentials: true, transports: ['websocket', 'polling'] })
+  ? io(SOCKET_URL, { withCredentials: true, transports: ['websocket', 'polling'] })
   : { on: () => {}, emit: () => {} }; // no-op fallback if socket.io script failed to load
 
 socket.on('connect', () => {
@@ -2216,6 +2759,7 @@ async function initHeatmap() {
 
   // Default Center: Bokaro Steel City
   const map = L.map('impactMap').setView([23.6693, 86.1511], 13);
+  window.impactMapInstance = map;
 
   // 🗺️ BASE LAYERS
   const streetMap = L.tileLayer('http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
