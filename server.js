@@ -1677,7 +1677,7 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
       });
 
       if (duplicateReport) {
-        try { fs.unlinkSync(req.file.path); } catch (e) {}
+        try { fs.unlinkSync(req.file.path); } catch (e) { }
         return res.json({
           success: false,
           message: 'Duplicate Photo! This image has already been used. Please upload a fresh photo.'
@@ -1689,7 +1689,7 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
         try {
           const result = await cloudinary.uploader.upload(req.file.path, { folder: process.env.CLOUDINARY_FOLDER || 'urbansync_uploads' });
           finalCompletionPhotoUrl = result.secure_url;
-          try { fs.unlinkSync(req.file.path); } catch (e) {}
+          try { fs.unlinkSync(req.file.path); } catch (e) { }
         } catch (err) {
           console.error("Cloudinary upload error:", err);
           finalCompletionPhotoUrl = `/uploads/${req.file.filename}`;

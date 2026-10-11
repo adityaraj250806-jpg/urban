@@ -6,11 +6,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://urbansync-app.onrender.com/api/:path*"
+      "destination": "https://urbansync-backend-cqgj.onrender.com/api/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://urbansync-app.onrender.com/uploads/:path*"
+      "destination": "https://urbansync-backend-cqgj.onrender.com/uploads/:path*"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "https://urbansync-backend-cqgj.onrender.com/socket.io/:path*"
     }
   ]
 }
