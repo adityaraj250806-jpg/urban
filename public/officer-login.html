@@ -211,25 +211,30 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify({ email, password })
                 });
 
                 const data = await response.json();
 
                 if (response.ok && data.success) {
+                    if (data.token) {
+                        localStorage.setItem('urbansync_token', data.token);
+                        localStorage.setItem('urbansync_officer_token', data.token);
+                    }
                     // Check if it's a zone officer
-                    if (data.admin.role === 'zone_officer') {
+                    if (data.admin.role === 'zone_officer' || data.admin.role === 'admin') {
                         showMessage('✅ Login successful! Redirecting...', 'success');
                         setTimeout(() => {
                             window.location.href = '/officer-dashboard.html';
-                        }, 1000);
+                        }, 800);
                     } else {
                         showMessage('❌ Access denied. This portal is for zone officers only.', 'error');
                         loginBtn.disabled = false;
                         loginBtn.textContent = 'Login';
                     }
                 } else {
-                    showMessage('❌ ' + (data.message || 'Invalid credentials'), 'error');
+                    showMessage('❌ ' + (data.error || data.message || 'Invalid credentials'), 'error');
                     loginBtn.disabled = false;
                     loginBtn.textContent = 'Login';
                 }

@@ -450,6 +450,31 @@
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
+        // Automatic Dual-Auth Interceptor (Cookies + Bearer Token Fallback)
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = function(url, options = {}) {
+                options = options || {};
+                options.credentials = options.credentials || 'include';
+                const token = localStorage.getItem('urbansync_worker_token') || localStorage.getItem('urbansync_token');
+                if (token) {
+                    options.headers = options.headers || {};
+                    if (options.headers instanceof Headers) {
+                        if (!options.headers.has('Authorization')) {
+                            options.headers.set('Authorization', 'Bearer ' + token);
+                        }
+                    } else if (Array.isArray(options.headers)) {
+                        options.headers.push(['Authorization', 'Bearer ' + token]);
+                    } else {
+                        if (!options.headers['Authorization']) {
+                            options.headers['Authorization'] = 'Bearer ' + token;
+                        }
+                    }
+                }
+                return originalFetch(url, options);
+            };
+        })();
+
         let currentWorker = null;
         let allReports = [];
         let currentTab = 'pending';
@@ -489,7 +514,11 @@
         }
 
         async function workerLogout() {
-            await fetch('/api/worker/logout', { method: 'POST' });
+            try {
+                await fetch('/api/worker/logout', { method: 'POST' });
+            } catch (e) {}
+            localStorage.removeItem('urbansync_token');
+            localStorage.removeItem('urbansync_worker_token');
             window.location.href = '/worker-login.html';
         }
 

@@ -150,7 +150,7 @@ mongoose.connect(process.env.MONGODB_URI)
           {
             name: 'Chief Municipal Officer - Bokaro',
             email: 'cmo@bokaro.gov.in',
-            password: 'SuperAdmin@2026',
+            password: 'SuperAdmin@2025',
             phone: '+91-9876543200',
             role: 'super_admin',
             department: 'Bokaro Municipal Administration',
@@ -337,57 +337,94 @@ app.get('/admin-login.html', (req, res, next) => {
 });
 
 
-// Auth middleware
+// Helper to extract authentication from session or JWT token (dual defense)
+const extractAuthData = (req) => {
+  let adminId = req.session?.adminId;
+  let userId = req.session?.userId;
+  let workerId = req.session?.workerId;
+  let role = req.session?.adminRole;
+
+  const authHeader = req.headers.authorization || req.headers['x-auth-token'];
+  if (authHeader) {
+    const tokenStr = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    try {
+      const decoded = jwt.verify(tokenStr, process.env.JWT_SECRET || 'urbansync-jwt-secret-2026');
+      if (decoded) {
+        if (decoded.adminId || (decoded.role && decoded.role.includes('admin'))) {
+          adminId = adminId || decoded.adminId || decoded.id;
+          role = role || decoded.role;
+        }
+        if (decoded.workerId || decoded.role === 'worker') {
+          workerId = workerId || decoded.workerId || decoded.id;
+        }
+        if (decoded.userId || decoded.role === 'citizen' || decoded.role === 'user') {
+          userId = userId || decoded.userId || decoded.id;
+        }
+      }
+    } catch (err) {}
+  }
+  return { adminId, userId, workerId, role };
+};
+
+// Auth middleware (Dual: Session + Bearer Token)
 const requireAuth = (req, res, next) => {
-  if (!req.session.userId && !req.user) {
+  const auth = extractAuthData(req);
+  if (!auth.userId && !req.user) {
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
+  req.sessionUserId = auth.userId;
   next();
 };
 
-const requireAdmin = (req, res, next) => {
-  if (!req.session.adminId) {
+const requireAdmin = async (req, res, next) => {
+  const auth = extractAuthData(req);
+  if (!auth.adminId) {
     return res.status(403).json({ success: false, error: 'Admin access required' });
   }
+  req.sessionAdminId = auth.adminId;
   next();
 };
 
 const requireRole = (...allowedRoles) => {
   return async (req, res, next) => {
     try {
-      if (!req.session.adminId) {
+      const auth = extractAuthData(req);
+      if (!auth.adminId) {
         return res.status(401).json({ success: false, error: 'Not authenticated' });
       }
 
-      const admin = await Admin.findById(req.session.adminId);
+      const admin = await Admin.findById(auth.adminId);
       if (!admin || !allowedRoles.includes(admin.role)) {
         return res.status(403).json({ success: false, error: 'Access denied' });
       }
 
       req.admin = admin;
+      req.sessionAdminId = auth.adminId;
       next();
     } catch (error) {
       res.status(500).json({ success: false, error: 'Authorization failed' });
     }
   };
 };
-// Super Admin Middleware
-const requireSuperAdmin = (req, res, next) => {
-  if (!req.session.adminId) {
+
+// Super Admin Middleware (Dual: Session + Bearer Token)
+const requireSuperAdmin = async (req, res, next) => {
+  const auth = extractAuthData(req);
+  if (!auth.adminId) {
     return res.status(401).json({ success: false, error: 'Not authenticated' });
   }
 
-  Admin.findById(req.session.adminId)
-    .then(admin => {
-      if (!admin || admin.role !== 'superadmin' && admin.role !== 'super_admin') {
-        return res.status(403).json({ success: false, error: 'Super Admin access required' });
-      }
-      req.admin = admin;
-      next();
-    })
-    .catch(error => {
-      res.status(500).json({ success: false, error: 'Authorization failed' });
-    });
+  try {
+    const admin = await Admin.findById(auth.adminId);
+    if (!admin || (admin.role !== 'superadmin' && admin.role !== 'super_admin')) {
+      return res.status(403).json({ success: false, error: 'Super Admin access required' });
+    }
+    req.admin = admin;
+    req.sessionAdminId = auth.adminId;
+    next();
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Authorization failed' });
+  }
 };
 
 // Credit system constants
@@ -574,8 +611,11 @@ app.post('/api/signup', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password, mobile } = req.body;
+    const cleanEmail = (email || '').toLowerCase().trim();
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({
+      email: { $regex: new RegExp(`^${cleanEmail}$`, 'i') }
+    });
     if (!user) {
       return res.json({ success: false, error: 'Invalid credentials' });
     }
@@ -585,25 +625,22 @@ app.post('/api/login', async (req, res) => {
       return res.json({ success: false, error: 'Invalid credentials' });
     }
 
-    if (mobile) {
-      const token = jwt.sign(
-        { userId: user._id, email: user.email },
-        process.env.JWT_SECRET || 'jwt-secret-key',
-        { expiresIn: '7d' }
-      );
-      return res.json({
+    const token = jwt.sign(
+      { id: user._id, userId: user._id, email: user.email, role: 'citizen' },
+      process.env.JWT_SECRET || 'urbansync-jwt-secret-2026',
+      { expiresIn: '30d' }
+    );
+
+    req.session.userId = user._id.toString();
+    req.session.userName = user.name;
+
+    req.session.save((err) => {
+      if (err) console.error('User session save error:', err);
+      res.json({
         success: true,
         token,
         user: { id: user._id, name: user.name, email: user.email }
       });
-    }
-
-    req.session.userId = user._id;
-    req.session.userName = user.name;
-
-    res.json({
-      success: true,
-      user: { id: user._id, name: user.name, email: user.email }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -623,8 +660,9 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/check-session', async (req, res) => {
   try {
-    if (req.session.userId) {
-      const user = await User.findById(req.session.userId).select('-password');
+    const userId = req.session?.userId || extractAuthData(req).userId;
+    if (userId) {
+      const user = await User.findById(userId).select('-password');
       if (user) {
         return res.json({
           loggedIn: true,
@@ -650,9 +688,13 @@ app.get('/api/health', (req, res) => {
 app.post('/api/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    const cleanEmail = (email || '').toLowerCase().trim();
 
-    const admin = await Admin.findOne({ email, isActive: true });
-    console.log(`🔍 Login Attempt: ${email}`);
+    const admin = await Admin.findOne({
+      email: { $regex: new RegExp(`^${cleanEmail}$`, 'i') },
+      isActive: true
+    });
+    console.log(`🔍 Officer/Admin Login Attempt: ${cleanEmail}`);
 
     if (!admin) {
       console.log('❌ Admin not found');
@@ -660,7 +702,7 @@ app.post('/api/admin/login', async (req, res) => {
     }
 
     const isMatch = await admin.comparePassword(password);
-    console.log(`Password Match: ${isMatch}`);
+    console.log(`Password Match for ${cleanEmail}: ${isMatch}`);
 
     if (!isMatch) {
       return res.json({ success: false, error: 'Invalid credentials' });
@@ -670,10 +712,17 @@ app.post('/api/admin/login', async (req, res) => {
     req.session.adminName = admin.name;
     req.session.adminRole = admin.role;
 
+    const token = jwt.sign(
+      { id: admin._id, adminId: admin._id, role: admin.role, email: admin.email },
+      process.env.JWT_SECRET || 'urbansync-jwt-secret-2026',
+      { expiresIn: '30d' }
+    );
+
     req.session.save((err) => {
       if (err) console.error('Admin session save error:', err);
       res.json({
         success: true,
+        token,
         admin: {
           id: admin._id,
           name: admin.name,
@@ -697,11 +746,13 @@ app.post('/api/admin/login', async (req, res) => {
 app.post('/api/super-admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    const cleanEmail = (email || '').toLowerCase().trim();
 
     const admin = await Admin.findOne({
-      email,
+      email: { $regex: new RegExp(`^${cleanEmail}$`, 'i') },
       isActive: true
     });
+    console.log(`🔍 Super Admin Login Attempt: ${cleanEmail}`);
 
     if (!admin) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -713,22 +764,34 @@ app.post('/api/super-admin/login', async (req, res) => {
     }
 
     const isMatch = await admin.comparePassword(password);
+    console.log(`Super Admin Password Match for ${cleanEmail}: ${isMatch}`);
+
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    req.session.adminId = admin._id;
+    req.session.adminId = admin._id.toString();
     req.session.adminName = admin.name;
     req.session.adminRole = admin.role;
 
-    res.json({
-      success: true,
-      admin: {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role
-      }
+    const token = jwt.sign(
+      { id: admin._id, adminId: admin._id, role: admin.role, email: admin.email },
+      process.env.JWT_SECRET || 'urbansync-jwt-secret-2026',
+      { expiresIn: '30d' }
+    );
+
+    req.session.save((err) => {
+      if (err) console.error('Super Admin session save error:', err);
+      res.json({
+        success: true,
+        token,
+        admin: {
+          id: admin._id,
+          name: admin.name,
+          email: admin.email,
+          role: admin.role
+        }
+      });
     });
   } catch (error) {
     console.error('Super Admin login error:', error);
@@ -739,7 +802,9 @@ app.post('/api/super-admin/login', async (req, res) => {
 // Get Super Admin Profile
 app.get('/api/super-admin/me', requireSuperAdmin, async (req, res) => {
   try {
-    const admin = await Admin.findById(req.session.adminId).select('-password');
+    const adminId = req.sessionAdminId || req.session?.adminId || extractAuthData(req).adminId;
+    const admin = await Admin.findById(adminId).select('-password');
+    if (!admin) return res.status(401).json({ success: false, error: 'Admin not found' });
     res.json(admin);
   } catch (error) {
     res.status(500).json({ success: false, error: 'Server error' });
@@ -814,8 +879,9 @@ app.get('/api/admin/me', requireAdmin, async (req, res) => {
 
 app.get('/api/officer/me', requireAdmin, async (req, res) => {
   try {
-    const officer = await Admin.findById(req.session.adminId).select('-password');
-    if (!officer || officer.role !== 'zone_officer') {
+    const adminId = req.sessionAdminId || req.session?.adminId || extractAuthData(req).adminId;
+    const officer = await Admin.findById(adminId).select('-password');
+    if (!officer || (officer.role !== 'zone_officer' && officer.role !== 'admin')) {
       return res.status(403).json({ success: false, error: 'Not a zone officer' });
     }
     res.json({ success: true, officer });
@@ -826,7 +892,8 @@ app.get('/api/officer/me', requireAdmin, async (req, res) => {
 
 app.get('/api/officer/workers', requireAdmin, async (req, res) => {
   try {
-    const officer = await Admin.findById(req.session.adminId);
+    const adminId = req.sessionAdminId || req.session?.adminId || extractAuthData(req).adminId;
+    const officer = await Admin.findById(adminId);
     if (!officer) return res.status(404).json({ success: false, error: 'Officer not found' });
 
     // 1. Find approved workers in officer's zones
@@ -1515,8 +1582,9 @@ app.post('/api/worker/register', upload.fields([
 app.post('/api/worker/login', async (req, res) => {
   try {
     const { mobile, password } = req.body;
+    const cleanMobile = (mobile || '').trim();
 
-    const worker = await Worker.findOne({ mobile, status: 'approved' });
+    const worker = await Worker.findOne({ mobile: cleanMobile, status: 'approved' });
 
     if (!worker) {
       return res.json({ success: false, message: 'Invalid credentials or not approved' });
@@ -1531,12 +1599,19 @@ app.post('/api/worker/login', async (req, res) => {
     req.session.workerName = worker.name;
     req.session.workerZone = worker.assignedZone;
 
+    const token = jwt.sign(
+      { id: worker._id, workerId: worker._id, role: 'worker', mobile: worker.mobile },
+      process.env.JWT_SECRET || 'urbansync-jwt-secret-2026',
+      { expiresIn: '30d' }
+    );
+
     req.session.save((err) => {
       if (err) {
         console.error('Worker session save error:', err);
       }
       res.json({
         success: true,
+        token,
         worker: {
           id: worker._id,
           name: worker.name,
@@ -1557,8 +1632,9 @@ app.post('/api/worker/logout', (req, res) => {
 
 app.get('/api/worker/check-auth', async (req, res) => {
   try {
-    if (req.session.workerId) {
-      const worker = await Worker.findById(req.session.workerId).select('-password');
+    const workerId = req.session?.workerId || extractAuthData(req).workerId;
+    if (workerId) {
+      const worker = await Worker.findById(workerId).select('-password');
       if (worker) {
         return res.json({
           success: true,
@@ -1659,18 +1735,22 @@ app.get('/api/admin/workers', requireAdmin, async (req, res) => {
 
 app.get('/api/worker/reports', async (req, res) => {
   try {
-    if (!req.session.workerId) {
+    const workerId = req.session?.workerId || extractAuthData(req).workerId;
+    if (!workerId) {
       return res.json({ success: false, message: 'Not authenticated' });
     }
 
-    const worker = await Worker.findById(req.session.workerId);
+    const worker = await Worker.findById(workerId);
+    if (!worker) {
+      return res.json({ success: false, message: 'Worker profile not found' });
+    }
     const zone = worker.assignedZone;
 
     // Get reports: pending in their zone, plus ANY task assigned to them (active or historical)
     const reports = await Report.find({
       $or: [
         { assignedZone: zone, status: 'pending' },
-        { assignedTo: req.session.workerId }
+        { assignedTo: workerId }
       ]
     })
       .populate('userId', 'name email')
@@ -1717,7 +1797,8 @@ app.get('/api/worker/reports', async (req, res) => {
 
 app.post('/api/worker/reports/:id/accept', async (req, res) => {
   try {
-    if (!req.session.workerId) {
+    const workerId = req.session?.workerId || extractAuthData(req).workerId;
+    if (!workerId) {
       return res.json({ success: false, message: 'Not authenticated' });
     }
 
@@ -1727,14 +1808,14 @@ app.post('/api/worker/reports/:id/accept', async (req, res) => {
     }
 
     report.status = 'in-progress';
-    report.assignedTo = req.session.workerId;
+    report.assignedTo = workerId;
     await report.save();
 
     // REAL-TIME UPDATE: Notify User
     req.io.emit('reportUpdated', {
       reportId: report.reportId,
       status: 'in-progress',
-      workerId: req.session.workerId,
+      workerId: workerId,
       updatedAt: new Date()
     });
 
@@ -1748,8 +1829,9 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
   try {
     const { id } = req.params;
     const { notes } = req.body;
+    const workerId = req.session?.workerId || extractAuthData(req).workerId;
 
-    if (!req.session.workerId) {
+    if (!workerId) {
       return res.json({ success: false, message: 'Worker authentication required. Please log in.' });
     }
 
@@ -1759,8 +1841,8 @@ app.post('/api/worker/reports/:id/complete', upload.single('photo'), async (req,
     }
 
     // Auto-assign to current worker if unassigned or taking over
-    if (!report.assignedTo || report.assignedTo.toString() !== req.session.workerId.toString()) {
-      report.assignedTo = req.session.workerId;
+    if (!report.assignedTo || report.assignedTo.toString() !== workerId.toString()) {
+      report.assignedTo = workerId;
     }
 
     let finalCompletionPhotoUrl = null;
@@ -1886,7 +1968,7 @@ app.get('/api/admin/create-demo-accounts', async (req, res) => {
       {
         name: 'Chief Municipal Officer - Bokaro',
         email: 'cmo@bokaro.gov.in',
-        password: 'SuperAdmin@2026',
+        password: 'SuperAdmin@2025',
         phone: '+91-9876543200',
         role: 'super_admin',
         department: 'Bokaro Municipal Administration',

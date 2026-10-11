@@ -513,6 +513,10 @@ async function handleLogin(e) {
 
     if (data.success) {
       currentUser = data.user;
+      if (data.token) {
+        localStorage.setItem('urbansync_token', data.token);
+        localStorage.setItem('urbansync_user_token', data.token);
+      }
       showNotification(`Welcome back, ${data.user.name}! 🎉`, 'success');
       closeModal('loginModal');
       document.getElementById('loginForm').reset();
@@ -579,6 +583,8 @@ async function logout() {
 
     if (response.ok) {
       showNotification('Logged out successfully', 'success');
+      localStorage.removeItem('urbansync_token');
+      localStorage.removeItem('urbansync_user_token');
 
       document.querySelectorAll('form').forEach(form => form.reset());
       document.querySelectorAll('input[type="file"]').forEach(input => {

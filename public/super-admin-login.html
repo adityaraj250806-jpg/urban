@@ -177,6 +177,19 @@
 
         // Pre-fill demo credentials
         emailInput.value = 'cmo@bokaro.gov.in';
+        passwordInput.value = 'SuperAdmin@2025';
+
+        // Click-to-fill demo credentials
+        const demoCredsBox = document.querySelector('.demo-creds');
+        if (demoCredsBox) {
+            demoCredsBox.style.cursor = 'pointer';
+            demoCredsBox.title = 'Click to auto-fill credentials';
+            demoCredsBox.addEventListener('click', () => {
+                emailInput.value = 'cmo@bokaro.gov.in';
+                passwordInput.value = 'SuperAdmin@2025';
+                showMessage('📋 Demo credentials filled! Click Login.', 'success');
+            });
+        }
 
         function showMessage(text, type) {
             message.textContent = text;
@@ -202,16 +215,21 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify({ email, password })
                 });
 
                 const data = await response.json();
 
-                if (response.ok) {
+                if (response.ok && data.success) {
+                    if (data.token) {
+                        localStorage.setItem('urbansync_token', data.token);
+                        localStorage.setItem('urbansync_superadmin_token', data.token);
+                    }
                     showMessage('✅ Login successful! Redirecting...', 'success');
                     setTimeout(() => {
                         window.location.href = '/super-admin-dashboard.html';
-                    }, 1000);
+                    }, 800);
                 } else {
                     showMessage('❌ ' + (data.message || 'Invalid credentials'), 'error');
                     loginBtn.disabled = false;

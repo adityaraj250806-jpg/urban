@@ -624,6 +624,31 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // Automatic Dual-Auth Interceptor (Cookies + Bearer Token Fallback)
+        (function() {
+            const originalFetch = window.fetch;
+            window.fetch = function(url, options = {}) {
+                options = options || {};
+                options.credentials = options.credentials || 'include';
+                const token = localStorage.getItem('urbansync_superadmin_token') || localStorage.getItem('urbansync_token');
+                if (token) {
+                    options.headers = options.headers || {};
+                    if (options.headers instanceof Headers) {
+                        if (!options.headers.has('Authorization')) {
+                            options.headers.set('Authorization', 'Bearer ' + token);
+                        }
+                    } else if (Array.isArray(options.headers)) {
+                        options.headers.push(['Authorization', 'Bearer ' + token]);
+                    } else {
+                        if (!options.headers['Authorization']) {
+                            options.headers['Authorization'] = 'Bearer ' + token;
+                        }
+                    }
+                }
+                return originalFetch(url, options);
+            };
+        })();
+
         // State
         let allWorkers = [];
         let socket;
@@ -661,14 +686,23 @@
         async function checkAuth() {
             try {
                 const res = await fetch('/api/super-admin/me');
-                if (!res.ok) window.location.href = '/super-admin-login.html';
+                if (!res.ok) {
+                    window.location.href = '/super-admin-login.html';
+                    return;
+                }
                 const data = await res.json();
                 document.getElementById('adminNameDisplay').innerText = data.name || 'Super Admin';
-            } catch (e) { window.location.href = '/super-admin-login.html'; }
+            } catch (e) {
+                window.location.href = '/super-admin-login.html';
+            }
         }
 
         async function logout() {
-            await fetch('/api/admin/logout', { method: 'POST' });
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+            } catch (e) {}
+            localStorage.removeItem('urbansync_token');
+            localStorage.removeItem('urbansync_superadmin_token');
             window.location.href = '/super-admin-login.html';
         }
 

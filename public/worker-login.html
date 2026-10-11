@@ -277,12 +277,17 @@
                 const response = await fetch('/api/worker/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ mobile, password })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
+                    if (data.token) {
+                        localStorage.setItem('urbansync_token', data.token);
+                        localStorage.setItem('urbansync_worker_token', data.token);
+                    }
                     Swal.fire({
                         icon: 'success',
                         title: 'Welcome Back!',
