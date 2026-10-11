@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://green-credits-v2-cj1g.vercel.app/</loc>
+    <loc>https://urbansync-backend-cqgj.onrender.com/</loc>
     <lastmod>2026-08-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://green-credits-v2-cj1g.vercel.app/worker-login.html</loc>
+    <loc>https://urbansync-backend-cqgj.onrender.com/worker-login.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://green-credits-v2-cj1g.vercel.app/officer-login.html</loc>
+    <loc>https://urbansync-backend-cqgj.onrender.com/officer-login.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://green-credits-v2-cj1g.vercel.app/super-admin-login.html</loc>
+    <loc>https://urbansync-backend-cqgj.onrender.com/super-admin-login.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
