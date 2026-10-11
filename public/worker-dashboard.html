@@ -450,12 +450,16 @@
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-        // Automatic Dual-Auth Interceptor (Cookies + Bearer Token Fallback)
+        // Automatic Dual-Auth & Direct Backend Interceptor (Bypasses Vercel 429 Proxy Limit)
         (function() {
             const originalFetch = window.fetch;
             window.fetch = function(url, options = {}) {
                 options = options || {};
                 options.credentials = options.credentials || 'include';
+                const backend = window.location.hostname.includes('vercel.app') ? 'https://urbansync-backend-cqgj.onrender.com' : '';
+                if (typeof url === 'string' && url.startsWith('/api/')) {
+                    url = backend + url;
+                }
                 const token = localStorage.getItem('urbansync_worker_token') || localStorage.getItem('urbansync_token');
                 if (token) {
                     options.headers = options.headers || {};
@@ -479,8 +483,9 @@
         let allReports = [];
         let currentTab = 'pending';
 
-        // Initialize Socket.io
-        const socket = typeof io !== 'undefined' ? io(window.location.origin, {
+        // Initialize Socket.io (direct to Render on Vercel to prevent proxy rate-limiting)
+        const socketTarget = window.location.hostname.includes('vercel.app') ? 'https://urbansync-backend-cqgj.onrender.com' : window.location.origin;
+        const socket = typeof io !== 'undefined' ? io(socketTarget, {
             withCredentials: true,
             transports: ['websocket', 'polling']
         }) : null;

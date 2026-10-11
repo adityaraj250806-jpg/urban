@@ -274,7 +274,8 @@
             btn.style.opacity = '0.8';
 
             try {
-                const response = await fetch('/api/worker/login', {
+                const BACKEND_URL = window.location.hostname.includes('vercel.app') ? 'https://urbansync-backend-cqgj.onrender.com' : '';
+                const response = await fetch(BACKEND_URL + '/api/worker/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',

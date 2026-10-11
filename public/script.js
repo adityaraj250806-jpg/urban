@@ -3,6 +3,35 @@
 // Bokaro Steel City Configuration
 // ============================================
 
+// Automatic Dual-Auth & Direct Backend Interceptor (Bypasses Vercel 429 Proxy Limit)
+(function() {
+  const originalFetch = window.fetch;
+  window.fetch = function(url, options = {}) {
+    options = options || {};
+    options.credentials = options.credentials || 'include';
+    const backend = window.location.hostname.includes('vercel.app') ? 'https://urbansync-backend-cqgj.onrender.com' : '';
+    if (typeof url === 'string' && url.startsWith('/api/')) {
+      url = backend + url;
+    }
+    const token = localStorage.getItem('urbansync_user_token') || localStorage.getItem('urbansync_token');
+    if (token) {
+      options.headers = options.headers || {};
+      if (options.headers instanceof Headers) {
+        if (!options.headers.has('Authorization')) {
+          options.headers.set('Authorization', 'Bearer ' + token);
+        }
+      } else if (Array.isArray(options.headers)) {
+        options.headers.push(['Authorization', 'Bearer ' + token]);
+      } else {
+        if (!options.headers['Authorization']) {
+          options.headers['Authorization'] = 'Bearer ' + token;
+        }
+      }
+    }
+    return originalFetch(url, options);
+  };
+})();
+
 let currentUser = null;
 let currentLocation = null; // Object: { lat, lng, address }
 
@@ -2680,8 +2709,10 @@ function showRedemptionSuccess(rewardName, cost, newBalance) {
 // ⚡ REAL-TIME UPDATES (Socket.io)
 // ============================================
 
-// Connect to the UrbanSync backend (auto-resolves to current origin for both local & production)
-const SOCKET_URL = window.location.origin;
+// Connect to the UrbanSync backend (auto-resolves to direct Render on Vercel to bypass 429 proxy limit)
+const SOCKET_URL = window.location.hostname.includes('vercel.app')
+  ? 'https://urbansync-backend-cqgj.onrender.com'
+  : window.location.origin;
 const socket = typeof io !== 'undefined'
   ? io(SOCKET_URL, { withCredentials: true, transports: ['websocket', 'polling'] })
   : { on: () => {}, emit: () => {} }; // no-op fallback if socket.io script failed to load
