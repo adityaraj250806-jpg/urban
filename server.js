@@ -37,9 +37,30 @@ const __dirname = path.dirname(__filename);
 const ALLOWED_ORIGINS = [
   'https://urbansync.vercel.app',
   /\.vercel\.app$/,  // any *.vercel.app preview deployment
+  'https://urbansync-backend-cqgj.onrender.com',
+  /\.onrender\.com$/,  // any *.onrender.com deployment
   'http://localhost:3000',
-  'http://127.0.0.1:3000'
+  'http://127.0.0.1:3000',
+  /^http:\/\/localhost:\d+$/,
+  /^http:\/\/127\.0\.0\.1:\d+$/,
+  'null'
 ];
+
+// Helper to reliably check allowed origins (handles strings, regex, and subdomains)
+const isOriginAllowed = (origin) => {
+  if (!origin || origin === 'null') return true;
+  const isMatch = ALLOWED_ORIGINS.some(o =>
+    typeof o === 'string' ? o === origin : (o instanceof RegExp ? o.test(origin) : false)
+  );
+  if (isMatch) return true;
+  // Broad fallback for Vercel, Render, and local domains
+  if (typeof origin === 'string') {
+    if (origin.includes('onrender.com') || origin.includes('vercel.app') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return true;
+    }
+  }
+  return false;
+};
 
 const app = express();
 const httpServer = createServer(app);
@@ -47,11 +68,7 @@ const io = new Server(httpServer, {
   cors: {
     origin: (origin, callback) => {
       console.log('Socket Connection Attempt from Origin:', origin);
-      if (!origin || origin === 'null') return callback(null, true);
-      const allowed = ALLOWED_ORIGINS.some(o =>
-        typeof o === 'string' ? o === origin : o.test(origin)
-      );
-      if (allowed) {
+      if (isOriginAllowed(origin)) {
         console.log('Socket Allowed Origin:', origin);
         return callback(null, true);
       }
@@ -123,7 +140,97 @@ if (!process.env.MONGODB_URI) {
 }
 
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('MongoDB Connected'))
+  .then(async () => {
+    console.log('MongoDB Connected');
+    try {
+      const adminCount = await Admin.countDocuments();
+      if (adminCount === 0) {
+        console.log('🌱 No admin accounts found. Auto-seeding initial demo accounts...');
+        const initialAdmins = await Admin.create([
+          {
+            name: 'Chief Municipal Officer - Bokaro',
+            email: 'cmo@bokaro.gov.in',
+            password: 'SuperAdmin@2026',
+            phone: '+91-9876543200',
+            role: 'super_admin',
+            department: 'Bokaro Municipal Administration',
+            isActive: true,
+            permissions: { canApproveWorkers: true, canAssignWork: true, canViewReports: true, canManageOfficers: true }
+          },
+          {
+            name: 'Rajesh Kumar - Zone 1 Officer',
+            email: 'officer1@bokaro.gov.in',
+            password: 'Officer@123',
+            phone: '+91-9876543201',
+            role: 'zone_officer',
+            department: 'Sanitation Department',
+            assignedZones: ['Zone 1 - North Bokaro'],
+            isActive: true,
+            permissions: { canApproveWorkers: true, canAssignWork: true, canViewReports: true, canManageOfficers: false }
+          },
+          {
+            name: 'Suresh Prasad - Zone 2 Officer',
+            email: 'officer2@bokaro.gov.in',
+            password: 'Officer@123',
+            phone: '+91-9876543202',
+            role: 'zone_officer',
+            department: 'Sanitation Department',
+            assignedZones: ['Zone 2 - South Bokaro'],
+            isActive: true,
+            permissions: { canApproveWorkers: true, canAssignWork: true, canViewReports: true, canManageOfficers: false }
+          },
+          {
+            name: 'Prakash Verma - Zone 3 Officer',
+            email: 'officer3@bokaro.gov.in',
+            password: 'Officer@123',
+            phone: '+91-9876543203',
+            role: 'zone_officer',
+            department: 'Sanitation Department',
+            assignedZones: ['Zone 3 - East Bokaro'],
+            isActive: true,
+            permissions: { canApproveWorkers: true, canAssignWork: true, canViewReports: true, canManageOfficers: false }
+          },
+          {
+            name: 'Anil Sengupta - Zone 4 Officer',
+            email: 'officer4@bokaro.gov.in',
+            password: 'Officer@123',
+            phone: '+91-9876543204',
+            role: 'zone_officer',
+            department: 'Sanitation Department',
+            assignedZones: ['Zone 4 - West Bokaro'],
+            isActive: true,
+            permissions: { canApproveWorkers: true, canAssignWork: true, canViewReports: true, canManageOfficers: false }
+          },
+          {
+            name: 'Mahesh Singh - Zone 5 Officer',
+            email: 'officer5@bokaro.gov.in',
+            password: 'Officer@123',
+            phone: '+91-9876543205',
+            role: 'zone_officer',
+            department: 'Sanitation Department',
+            assignedZones: ['Zone 5 - Central Bokaro'],
+            isActive: true,
+            permissions: { canApproveWorkers: true, canAssignWork: true, canViewReports: true, canManageOfficers: false }
+          }
+        ]);
+        console.log('✅ Demo Officers seeded successfully');
+      }
+
+      const workerCount = await Worker.countDocuments();
+      if (workerCount === 0) {
+        console.log('🌱 No workers found. Auto-seeding initial demo workers...');
+        const firstAdmin = await Admin.findOne();
+        await Worker.create([
+          { name: 'Raju Kumar', mobile: '9999999991', email: 'raju@worker.com', password: 'Worker@123', aadhaar: '123456789011', address: 'Sector 1, Bokaro Steel City', assignedZone: 'Zone 1 - North Bokaro', status: 'approved', approvedBy: firstAdmin?._id, approvedDate: new Date() },
+          { name: 'Sunita Devi', mobile: '9999999993', email: 'sunita@worker.com', password: 'Worker@123', aadhaar: '123456789013', address: 'Sector 8, Bokaro Steel City', assignedZone: 'Zone 3 - East Bokaro', status: 'approved', approvedBy: firstAdmin?._id, approvedDate: new Date() },
+          { name: 'Deepak Hansda', mobile: '9999999994', email: 'deepak@worker.com', password: 'Worker@123', aadhaar: '123456789014', address: 'Sector 5, Bokaro Steel City', assignedZone: 'Zone 4 - West Bokaro', status: 'approved', approvedBy: firstAdmin?._id, approvedDate: new Date() }
+        ]);
+        console.log('✅ Demo Workers seeded successfully');
+      }
+    } catch (seedErr) {
+      console.warn('Auto-seed check warning:', seedErr.message);
+    }
+  })
   .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 // Create uploads directory
@@ -158,17 +265,13 @@ const upload = multer({
 // ==========================================
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, same-origin)
-    if (!origin) return callback(null, true);
-    const allowed = ALLOWED_ORIGINS.some(o =>
-      typeof o === 'string' ? o === origin : o.test(origin)
-    );
-    if (allowed) return callback(null, true);
+    if (isOriginAllowed(origin)) return callback(null, true);
+    console.log('CORS blocked:', origin);
     callback(new Error(`CORS blocked: ${origin}`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
 // Middleware
